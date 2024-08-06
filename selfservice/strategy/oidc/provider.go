@@ -63,6 +63,7 @@ type Claims struct {
 	Nonce               string                 `json:"nonce,omitempty"`
 	NonceSupported      bool                   `json:"nonce_supported,omitempty"`
 	RawClaims           map[string]interface{} `json:"raw_claims,omitempty"`
+	TransferSubject     string                 `json:"transfer_sub,omitempty"`
 }
 
 // Validate checks if the claims are valid.
