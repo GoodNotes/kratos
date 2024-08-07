@@ -172,7 +172,7 @@ format: .bin/goimports .bin/ory node_modules
 # Build local docker image
 .PHONY: docker
 docker:
-	DOCKER_BUILDKIT=1 DOCKER_CONTENT_TRUST=1 docker build -f .docker/Dockerfile-build --build-arg=COMMIT=$(VCS_REF) --build-arg=BUILD_DATE=$(BUILD_DATE) -t oryd/kratos:${IMAGE_TAG} .
+	DOCKER_BUILDKIT=1 DOCKER_CONTENT_TRUST=1 docker buildx build --platform linux/amd64,linux/arm64 -f .docker/Dockerfile-build --build-arg=COMMIT=$(VCS_REF) --build-arg=BUILD_DATE=$(BUILD_DATE) -t 633242083549.dkr.ecr.us-east-1.amazonaws.com/goodnotes-web-sandbox-docker/oryd/kratos:v1.1.0-apptransfer .
 
 .PHONY: test-e2e
 test-e2e: node_modules test-resetdb kratos-config-e2e
