@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -134,5 +136,104 @@ func (c *microsoftUnverifiedClaims) Valid() error {
 func (p *ProviderMicrosoft) Verify(ctx context.Context, rawIDToken string) (*Claims, error) {
 	keySet := gooidc.NewRemoteKeySet(ctx, p.JWKSUrl)
 	ctx = gooidc.ClientContext(ctx, p.reg.HTTPClient(ctx).HTTPClient)
-	return verifyToken(ctx, keySet, p.config, rawIDToken, fmt.Sprintf("https://login.microsoftonline.com/%s/v2.0", p.config.Tenant))
+	issuer, err := p.extractIssuerFromIDToken(rawIDToken)
+	if err != nil {
+		return nil, err
+	}
+
+	return verifyToken(ctx, keySet, p.config, rawIDToken, issuer)
+}
+
+func (p *ProviderMicrosoft) extractIssuerFromIDToken(rawIDToken string) (string, error) {
+	token, _, err := new(jwt.Parser).ParseUnverified(rawIDToken, jwt.MapClaims{})
+	if err != nil {
+		return "", errors.WithStack(herodot.ErrInternalServerError.WithReasonf("error decoding: %s", err))
+	}
+
+	var kid string
+	var claimsIssuer string
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		if iss, ok := claims["iss"].(string); ok {
+			claimsIssuer = iss
+		} else {
+			claimsIssuer = fmt.Sprintf("https://login.microsoftonline.com/%s/v2.0", p.config.Tenant)
+		}
+		if k, ok := claims["kid"].(string); ok {
+			kid = k
+		} else {
+			return claimsIssuer, nil
+		}
+	}
+	fmt.Println(kid)
+	issuer, err := fetchIssuerFromKid(kid)
+	if err != nil {
+		return claimsIssuer, nil
+	}
+
+	return issuer, nil
+}
+
+func fetchIssuerFromKid(targetKid string) (string, error) {
+	url := "https://login.microsoftonline.com/common/discovery/v2.0/keys"
+	jwks, err := fetchMicrosoftDiscoveryKeys(url)
+	if err != nil {
+		return "", err
+	}
+
+	key, err := findKeyByKid(jwks, targetKid)
+	if err != nil {
+		return "", err
+	}
+
+	return key.Iss, nil
+}
+
+type JWK struct {
+	Kid string   `json:"kid"`
+	Kty string   `json:"kty"`
+	Use string   `json:"use"`
+	Alg string   `json:"alg,omitempty"`
+	X5t string   `json:"x5t,omitempty"`
+	N   string   `json:"n,omitempty"`
+	E   string   `json:"e,omitempty"`
+	X5c []string `json:"x5c,omitempty"`
+	Iss string   `json:"issuer,omitempty"`
+}
+
+type JWKS struct {
+	Keys []JWK `json:"keys"`
+}
+
+func fetchMicrosoftDiscoveryKeys(url string) (*JWKS, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("faield to fetch JWKS: %s", err))
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("unexpected HTTP status: %s", resp.Status))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("failed to read JWKS body: %s", err))
+	}
+
+	var jwks JWKS
+	if err := json.Unmarshal(body, &jwks); err != nil {
+		return nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("failed to umarshal: %s", err))
+	}
+
+	return &jwks, nil
+}
+
+func findKeyByKid(jwks *JWKS, kid string) (*JWK, error) {
+	for _, key := range jwks.Keys {
+		if key.Kid == kid {
+			return &key, nil
+		}
+	}
+	return nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("key with kid %s not found", kid))
 }
