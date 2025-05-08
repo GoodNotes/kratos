@@ -40,7 +40,7 @@ func NewProviderMicrosoft(
 			config: config,
 			reg:    reg,
 		},
-		JWKSUrl: "https://login.microsoftonline.com/common/discovery/keys",
+		JWKSUrl: "https://login.microsoftonline.com/common/discovery/v2.0/keys",
 	}
 }
 
