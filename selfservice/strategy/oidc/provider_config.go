@@ -129,6 +129,12 @@ type Configuration struct {
 	// Instead of <base-url>/self-service/methods/oidc/callback/<provider>, you must use <base-url>/self-service/methods/oidc/callback
 	// (Note the missing <provider> path segment and no trailing slash).
 	PKCE string `json:"pkce"`
+
+	// JWKS is the JSON Web Key Set (JWKS) URL that contains the public keys used to verify the ID Token's signature.
+	// This is only relevant in OIDC flows that submit an IDToken instead of using the callback from the OIDC provider.
+	OpenIDConfigurationUrl string `json:"open_id_configuration_url"`
+
+	IDTokenVerificationEnabled bool `json:"id_token_verification_enabled"`
 }
 
 func (p Configuration) Redir(public *url.URL) string {

@@ -5,6 +5,9 @@ package oidc
 
 import (
 	"context"
+	"encoding/json"
+	"io"
+	"net/http"
 	"net/url"
 
 	"github.com/pkg/errors"
@@ -213,4 +216,47 @@ func (g *ProviderGenericOIDC) verifiedIDToken(ctx context.Context, exchange *oau
 	}
 
 	return token, nil
+}
+
+func (g *ProviderGenericOIDC) Verify(ctx context.Context, rawIDToken string) (*Claims, error) {
+	if !g.config.IDTokenVerificationEnabled {
+		return nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("The provider %s does not support id_token verification", g.Config().ID))
+	}
+	openIdConfiguration, err := fetchOpenIdConfiguration(g.config.OpenIDConfigurationUrl)
+	if err != nil {
+		return nil, err
+	}
+	keySet := gooidc.NewRemoteKeySet(ctx, openIdConfiguration.JWKSUrl)
+	ctx = gooidc.ClientContext(ctx, g.reg.HTTPClient(ctx).HTTPClient)
+
+	return verifyToken(ctx, keySet, g.config, rawIDToken, openIdConfiguration.Issuer)
+}
+
+type OpenIDConfiguration struct {
+	Issuer  string `json:"issuer"`
+	JWKSUrl string `json:"jwks_uri"`
+}
+
+func fetchOpenIdConfiguration(url string) (*OpenIDConfiguration, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("faield to fetch OpenIDConfiguration: %s", err))
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("unexpected HTTP status: %s", resp.Status))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("failed to read OpenIDConfiguration body: %s", err))
+	}
+
+	var openIDConfiguration OpenIDConfiguration
+	if err := json.Unmarshal(body, &openIDConfiguration); err != nil {
+		return nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("failed to umarshal: %s", err))
+	}
+
+	return &openIDConfiguration, nil
 }
