@@ -222,14 +222,18 @@ func (g *ProviderGenericOIDC) Verify(ctx context.Context, rawIDToken string) (*C
 	if !g.config.IDTokenVerificationEnabled {
 		return nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("The provider %s does not support id_token verification", g.Config().ID))
 	}
-	openIdConfiguration, err := fetchOpenIdConfiguration(g.config.OpenIDConfigurationUrl)
+	p, err := g.provider(ctx)
 	if err != nil {
 		return nil, err
 	}
-	keySet := gooidc.NewRemoteKeySet(ctx, openIdConfiguration.JWKSUrl)
-	ctx = gooidc.ClientContext(ctx, g.reg.HTTPClient(ctx).HTTPClient)
-
-	return verifyToken(ctx, keySet, g.config, rawIDToken, openIdConfiguration.Issuer)
+	// Boxyhq use camelCase for keys in claims, but Kratos expect the keys to be snake_case.
+	// Fortunately, the verifyAndDecodeClaimsWithProvider will put the whole Boxyhq claims into the "raw_claims" field.
+	// So we can get Boxyhq claims from raw_claims, and extract fields like "firstName" and "lastName".
+	claims, err := g.verifyAndDecodeClaimsWithProvider(ctx, p, rawIDToken)
+	if err != nil {
+		return nil, err
+	}
+	return claims, nil
 }
 
 type OpenIDConfiguration struct {
