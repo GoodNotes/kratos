@@ -51,6 +51,15 @@ func (g *ProviderGenericOIDC) provider(ctx context.Context) (*gooidc.Provider, e
 	if g.p == nil {
 		p, err := gooidc.NewProvider(g.withHTTPClientContext(ctx), g.config.IssuerURL)
 		if err != nil {
+			// Try different issuer URLs for apple, since Apple side is returning incorrect issuer URLs
+			if g.config.IssuerURL == "https://account.apple.com" {
+				p, err = gooidc.NewProvider(g.withHTTPClientContext(ctx), "https://appleid.apple.com")
+			}
+			if g.config.IssuerURL == "https://appleid.apple.com" {
+				p, err = gooidc.NewProvider(g.withHTTPClientContext(ctx), "https://account.apple.com")
+			}
+		}
+		if err != nil {
 			return nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("Unable to initialize OpenID Connect Provider: %s", err))
 		}
 		g.p = p
