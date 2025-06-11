@@ -29,13 +29,13 @@ func NewProviderApple(
 	config *Configuration,
 	reg Dependencies,
 ) Provider {
-	config.IssuerURL = "https://appleid.apple.com"
+	config.IssuerURL = "https://account.apple.com"
 	return &ProviderApple{
 		ProviderGenericOIDC: &ProviderGenericOIDC{
 			config: config,
 			reg:    reg,
 		},
-		JWKSUrl: "https://appleid.apple.com/auth/keys",
+		JWKSUrl: "https://account.apple.com/auth/keys",
 	}
 }
 
@@ -60,7 +60,7 @@ func (a *ProviderApple) newClientSecret() (string, error) {
 
 	appleToken := jwt.NewWithClaims(jwt.SigningMethodES256,
 		jwt.RegisteredClaims{
-			Audience:  []string{"https://appleid.apple.com"},
+			Audience:  []string{"https://account.apple.com"},
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(now),
 			Issuer:    a.config.TeamId,
@@ -80,8 +80,8 @@ func (a *ProviderApple) oauth2(ctx context.Context) (*oauth2.Config, error) {
 	a.config.ClientSecret = secret
 
 	endpoint := oauth2.Endpoint{
-		AuthURL:  "https://appleid.apple.com/auth/authorize",
-		TokenURL: "https://appleid.apple.com/auth/token",
+		AuthURL:  "https://account.apple.com/auth/authorize",
+		TokenURL: "https://account.apple.com/auth/token",
 	}
 	return a.oauth2ConfigFromEndpoint(ctx, endpoint), nil
 }
@@ -154,7 +154,7 @@ func (a *ProviderApple) DecodeQuery(query url.Values, claims *Claims) {
 
 var _ IDTokenVerifier = new(ProviderApple)
 
-const issuerUrlApple = "https://appleid.apple.com"
+const issuerUrlApple = "https://account.apple.com"
 
 func (a *ProviderApple) Verify(ctx context.Context, rawIDToken string) (*Claims, error) {
 	keySet := oidc.NewRemoteKeySet(ctx, a.JWKSUrl)

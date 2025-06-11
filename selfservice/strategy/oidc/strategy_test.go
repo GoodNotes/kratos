@@ -977,7 +977,7 @@ func TestStrategy(t *testing.T) {
 			{
 				name: "should fail if no nonce is included in the id_token",
 				idToken: `{
-					"iss": "https://appleid.apple.com",
+					"iss": "https://account.apple.com",
 					"sub": "{{sub}}"
 				}`,
 				expect: func(t *testing.T, res *http.Response, body []byte) {
@@ -987,7 +987,7 @@ func TestStrategy(t *testing.T) {
 			{
 				name: "should fail if no nonce is supplied in request",
 				idToken: `{
-					"iss": "https://appleid.apple.com",
+					"iss": "https://account.apple.com",
 					"sub": "{{sub}}",
 					"nonce": "{{nonce}}"
 				}`,
@@ -1004,7 +1004,7 @@ func TestStrategy(t *testing.T) {
 			{
 				name: "should pass if claims are valid",
 				idToken: `{
-					"iss": "https://appleid.apple.com",
+					"iss": "https://account.apple.com",
 					"sub": "{{sub}}",
 					"nonce": "{{nonce}}"
 				}`,
@@ -1015,7 +1015,7 @@ func TestStrategy(t *testing.T) {
 			{
 				name: "nonce mismatch",
 				idToken: `{
-					"iss": "https://appleid.apple.com",
+					"iss": "https://account.apple.com",
 					"sub": "{{sub}}",
 					"nonce": "random-nonce"
 				}`,
