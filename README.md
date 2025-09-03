@@ -1,3 +1,9 @@
+# For Goodnotes members
+We use this internal fork in Goodnotes and the image is published to a **public ECR**.
+The image push process is currently manual and will need someone with permission to the DevOps account.
+Please merge your changes to the `goodnotes` branch and reach out in #function-devops to push a new image version
+
+---
 <h1 align="center"><img src="https://raw.githubusercontent.com/ory/meta/master/static/banners/kratos.svg" alt="Ory Kratos - Cloud native Identity and User Management"></h1>
 
 <h4 align="center">
