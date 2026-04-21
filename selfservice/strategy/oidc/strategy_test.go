@@ -885,6 +885,52 @@ func TestStrategy(t *testing.T) {
 				tc.then(t)
 			})
 		}
+		t.Run("case=should return exchange code even if already authenticated", func(t *testing.T) {
+			subject = "existing-session-api-code-testing@ory.sh"
+			jar := x.Must(cookiejar.New(nil))
+
+			t.Run("step=register and create a session", func(t *testing.T) {
+				returnTo := "/foo"
+				r := newBrowserLoginFlow(t, fmt.Sprintf("%s?return_to=%s", returnTS.URL, returnTo), time.Minute)
+				action := assertFormValues(t, r.ID, "valid")
+
+				res, body := makeRequestWithCookieJar(t, "valid", action, url.Values{}, jar, nil)
+				assert.True(t, strings.HasSuffix(res.Request.URL.String(), returnTo))
+				assertIdentity(t, res, body)
+			})
+
+			t.Run("step=perform login and get exchange code", func(t *testing.T) {
+				f := newAPILoginFlow(t, returnTS.URL+"?return_session_token_exchange_code=true&return_to=/app_code", 1*time.Minute)
+
+				_, err := exchangeCodeForToken(t, sessiontokenexchange.Codes{InitCode: f.SessionTokenExchangeCode})
+				require.Error(t, err)
+
+				action := assertFormValues(t, f.ID, "valid")
+				res, err := http.Post(action, "application/json", strings.NewReader(fmt.Sprintf(`{
+	"method": "oidc",
+	"provider": %q
+}`, "valid")))
+				require.NoError(t, err)
+				require.Equal(t, http.StatusUnprocessableEntity, res.StatusCode)
+				var changeLocation flow.BrowserLocationChangeRequiredError
+				require.NoError(t, json.NewDecoder(res.Body).Decode(&changeLocation))
+
+				res, err = testhelpers.NewClientWithCookieJar(t, jar, nil).Get(changeLocation.RedirectBrowserTo)
+				require.NoError(t, err)
+
+				returnToURL := res.Request.URL
+				returnToCode := returnToURL.Query().Get("code")
+				assert.NotEmpty(t, returnToCode, "code query param was empty in the return_to URL")
+
+				codeResponse, err := exchangeCodeForToken(t, sessiontokenexchange.Codes{
+					InitCode:     f.SessionTokenExchangeCode,
+					ReturnToCode: returnToCode,
+				})
+				require.NoError(t, err)
+				assert.NotEmpty(t, codeResponse.Token)
+				assert.Equal(t, subject, gjson.GetBytes(codeResponse.Session.Identity.Traits, "subject").String())
+			})
+		})
 		t.Run("case=should use redirect_to URL on failure", func(t *testing.T) {
 			ctx := context.Background()
 			subject = "existing-subject-api-code-testing@ory.sh"
