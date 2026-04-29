@@ -677,7 +677,6 @@ func TestManager(t *testing.T) {
 			// That is why we only check the identity in the store.
 			checkExtensionFields(fromStore, "email-updatetraits-1@ory.sh")(t)
 		})
-
 	})
 
 	t.Run("method=RefreshAvailableAAL", func(t *testing.T) {
