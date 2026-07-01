@@ -669,7 +669,11 @@ func (p *IdentityPersister) CreateIdentities(ctx context.Context, identities ...
 			// Manually roll back by deleting the identities that were inserted before the
 			// error occurred.
 			if err := p.DeleteIdentities(ctx, failedIDs); err != nil {
-				return sqlcon.HandleError(err)
+				// If cleanup fails (e.g. transient DB error), log and still commit
+				// the successful inserts rather than rolling back everything.
+				// The orphaned identity records may need manual cleanup.
+				p.r.Logger().WithError(sqlcon.HandleError(err)).
+					Error("Failed to delete conflicting identities during batch create; orphaned records may remain")
 			}
 
 			return nil
