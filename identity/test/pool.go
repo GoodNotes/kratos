@@ -360,9 +360,29 @@ func TestPool(ctx context.Context, p persistence.Persister, m *identity.Manager,
 			})
 
 			t.Run("create exactly the non-conflicting ones", func(t *testing.T) {
+				// Pre-insert 40 identities (indices 0–39) so the conflicts in the
+				// batch below are against rows already in the DB. Without this,
+				// intra-batch conflict resolution is non-deterministic — either side
+				// of each duplicate pair could win.
+				preExisting := make([]*identity.Identity, 40)
+				for i := range preExisting {
+					preExisting[i] = NewTestIdentity(4, "persister-create-multiple-2", i)
+				}
+				require.NoError(t, p.CreateIdentities(ctx, preExisting...))
+				defer func() {
+					for _, id := range preExisting {
+						require.NoError(t, p.DeleteIdentity(ctx, id.ID))
+					}
+				}()
+
+				// First 60 use indices 100–159 (no conflicts); last 40 duplicate the
+				// pre-existing indices 0–39 and are guaranteed to fail.
 				identities := make([]*identity.Identity, 100)
-				for i := range identities {
-					identities[i] = NewTestIdentity(4, "persister-create-multiple-2", i%60)
+				for i := range identities[:60] {
+					identities[i] = NewTestIdentity(4, "persister-create-multiple-2", 100+i)
+				}
+				for i := range identities[60:] {
+					identities[60+i] = NewTestIdentity(4, "persister-create-multiple-2", i)
 				}
 				err := p.CreateIdentities(ctx, identities...)
 				if dbname == "mysql" {

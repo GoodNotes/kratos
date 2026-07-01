@@ -810,8 +810,18 @@ func TestHandler(t *testing.T) {
 				assert.Equal(t, "Conflict", body.Get("identities.4.error.status").String())
 				assert.Equal(t, "Bad Request", body.Get("identities.6.error.status").String())
 
+				// Only collect identity IDs from successful patches. Error entries have
+				// no "identity" field, so iterating the full array and unmarshaling
+				// would yield zero UUIDs for those positions and corrupt the slice.
 				var identityIDs []uuid.UUID
-				require.NoErrorf(t, json.Unmarshal(([]byte)(body.Get("identities.#.identity").Raw), &identityIDs), "%s", body)
+				for _, item := range body.Get("identities").Array() {
+					if item.Get("action").String() == string(identity.ActionCreate) {
+						id := uuid.FromStringOrNil(item.Get("identity").String())
+						require.NotZerof(t, id, "expected non-zero UUID for create action: %s", body)
+						identityIDs = append(identityIDs, id)
+					}
+				}
+				require.Lenf(t, identityIDs, len(expectedToPass), "%s", body)
 
 				actualIdentities, _, err := reg.Persister().ListIdentities(ctx, identity.ListIdentityParameters{IdsFilter: identityIDs})
 				require.NoError(t, err)
