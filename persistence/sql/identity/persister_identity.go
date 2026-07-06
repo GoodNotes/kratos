@@ -593,7 +593,8 @@ func (p *IdentityPersister) CreateIdentities(ctx context.Context, identities ...
 		}
 	}()
 
-	return p.Transaction(ctx, func(ctx context.Context, tx *pop.Connection) error {
+	var partialErr *identity.CreateIdentitiesError
+	if err := p.Transaction(ctx, func(ctx context.Context, tx *pop.Connection) error {
 		conn := &batch.TracerConnection{
 			Tracer:     p.r.Tracer(ctx),
 			Connection: tx,
@@ -601,6 +602,7 @@ func (p *IdentityPersister) CreateIdentities(ctx context.Context, identities ...
 
 		succeededIDs = make([]uuid.UUID, 0, len(identities))
 		failedIdentityIDs := make(map[uuid.UUID]struct{})
+		partialErr = nil
 
 		// Don't use batch.WithPartialInserts, because identities have no other
 		// constraints other than the primary key that could cause conflicts.
@@ -653,7 +655,7 @@ func (p *IdentityPersister) CreateIdentities(ctx context.Context, identities ...
 		// If any of the batch inserts failed on conflict, let's delete the corresponding
 		// identities and return a list of failed identities in the error.
 		if len(failedIdentityIDs) > 0 {
-			partialErr := &identity.CreateIdentitiesError{}
+			partialErr = identity.NewCreateIdentitiesError(len(failedIdentityIDs))
 			failedIDs := make([]uuid.UUID, 0, len(failedIdentityIDs))
 
 			for _, ident := range identities {
@@ -667,10 +669,14 @@ func (p *IdentityPersister) CreateIdentities(ctx context.Context, identities ...
 			// Manually roll back by deleting the identities that were inserted before the
 			// error occurred.
 			if err := p.DeleteIdentities(ctx, failedIDs); err != nil {
-				return sqlcon.HandleError(err)
+				// If cleanup fails (e.g. transient DB error), log and still commit
+				// the successful inserts rather than rolling back everything.
+				// The orphaned identity records may need manual cleanup.
+				p.r.Logger().WithError(sqlcon.HandleError(err)).
+					Error("Failed to delete conflicting identities during batch create; orphaned records may remain")
 			}
 
-			return partialErr
+			return nil
 		} else {
 			// No failures: report all identities as created.
 			for _, ident := range identities {
@@ -679,7 +685,10 @@ func (p *IdentityPersister) CreateIdentities(ctx context.Context, identities ...
 		}
 
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	return partialErr.ErrOrNil()
 }
 
 func (p *IdentityPersister) HydrateIdentityAssociations(ctx context.Context, i *identity.Identity, expand identity.Expandables) (err error) {
