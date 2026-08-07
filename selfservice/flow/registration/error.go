@@ -137,8 +137,21 @@ func (s *ErrorHandler) WriteFlowError(
 		http.Redirect(w, r, f.AppendTo(s.d.Config().SelfServiceFlowRegistrationUI(r.Context())).String(), http.StatusFound)
 		return
 	}
-	if _, hasCode, _ := s.d.SessionTokenExchangePersister().CodeForFlow(r.Context(), f.ID); group == node.OpenIDConnectGroup && f.Type == flow.TypeAPI && hasCode {
-		http.Redirect(w, r, f.ReturnTo, http.StatusSeeOther)
+	if codes, hasCode, _ := s.d.SessionTokenExchangePersister().CodeForFlow(r.Context(), f.ID); group == node.OpenIDConnectGroup && f.Type == flow.TypeAPI && hasCode {
+		returnTo, err := x.SecureRedirectTo(
+			r,
+			s.d.Config().SelfServiceBrowserDefaultReturnTo(r.Context()),
+			f.SecureRedirectToOpts(r.Context(), s.d)...,
+		)
+		if err != nil {
+			s.forward(w, r, f, errors.WithStack(err))
+			return
+		}
+		q := returnTo.Query()
+		q.Set("code", codes.ReturnToCode)
+		q.Set("flow", f.ID.String())
+		returnTo.RawQuery = q.Encode()
+		http.Redirect(w, r, returnTo.String(), http.StatusSeeOther)
 		return
 	}
 
