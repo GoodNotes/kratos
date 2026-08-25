@@ -19,6 +19,13 @@ type DuplicateCredentialsData struct {
 	CredentialsType     identity.CredentialsType
 	CredentialsConfig   sqlxx.JSONRawMessage
 	DuplicateIdentifier string
+
+	// AvailableCredentialTypes and AvailableProviders record the ways the existing
+	// account can be verified. They are needed to re-render the account-linking
+	// screen after a failed verification attempt, which would otherwise come back
+	// without any verification options at all.
+	AvailableCredentialTypes []string
+	AvailableProviders       []string
 }
 
 type InternalContexter interface {

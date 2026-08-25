@@ -353,7 +353,7 @@ func (e *HookExecutor) maybeLinkCredentials(ctx context.Context, sess *session.S
 		return nil
 	}
 
-	if err := e.checkDuplicateCredentialsIdentifierMatch(ctx, ident.ID, lc.DuplicateIdentifier); err != nil {
+	if err := e.checkDuplicateCredentialsIdentifierMatch(ctx, ident.ID, lc); err != nil {
 		return err
 	}
 	strategy, err := e.d.AllLoginStrategies().Strategy(lc.CredentialsType)
@@ -377,17 +377,17 @@ func (e *HookExecutor) maybeLinkCredentials(ctx context.Context, sess *session.S
 	return nil
 }
 
-func (e *HookExecutor) checkDuplicateCredentialsIdentifierMatch(ctx context.Context, identityID uuid.UUID, match string) error {
+func (e *HookExecutor) checkDuplicateCredentialsIdentifierMatch(ctx context.Context, identityID uuid.UUID, lc *flow.DuplicateCredentialsData) error {
 	i, err := e.d.PrivilegedIdentityPool().GetIdentityConfidential(ctx, identityID)
 	if err != nil {
 		return err
 	}
 	for _, credentials := range i.Credentials {
 		for _, identifier := range credentials.Identifiers {
-			if identifier == match {
+			if identifier == lc.DuplicateIdentifier {
 				return nil
 			}
 		}
 	}
-	return schema.NewLinkedCredentialsDoNotMatch()
+	return schema.NewLinkedCredentialsDoNotMatch(lc.DuplicateIdentifier, lc.AvailableCredentialTypes, lc.AvailableProviders)
 }

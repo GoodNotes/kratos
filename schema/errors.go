@@ -359,13 +359,13 @@ func NewLoginCodeInvalid() error {
 	})
 }
 
-func NewLinkedCredentialsDoNotMatch() error {
+func NewLinkedCredentialsDoNotMatch(dupIdentifier string, availableCredentials, availableProviders []string) error {
 	return errors.WithStack(&ValidationError{
 		ValidationError: &jsonschema.ValidationError{
 			Message:     `linked credentials do not match; please start a new flow`,
 			InstancePtr: "#/",
 		},
-		Messages: new(text.Messages).Add(text.NewErrorValidationLoginLinkedCredentialsDoNotMatch()),
+		Messages: new(text.Messages).Add(text.NewErrorValidationLoginLinkedCredentialsDoNotMatch(dupIdentifier, availableCredentials, availableProviders)),
 	})
 }
 

@@ -256,11 +256,16 @@ func NewInfoSelfServiceLoginCode() *Message {
 	}
 }
 
-func NewErrorValidationLoginLinkedCredentialsDoNotMatch() *Message {
+func NewErrorValidationLoginLinkedCredentialsDoNotMatch(dupIdentifier string, availableCredentials, availableProviders []string) *Message {
 	return &Message{
 		ID:   ErrorValidationLoginLinkedCredentialsDoNotMatch,
 		Text: "Linked credentials do not match.",
 		Type: Error,
+		Context: context(map[string]any{
+			"duplicate_identifier":       dupIdentifier,
+			"available_credential_types": availableCredentials,
+			"available_providers":        availableProviders,
+		}),
 	}
 }
 

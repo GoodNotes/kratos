@@ -610,6 +610,13 @@ func (s *Strategy) handleError(ctx context.Context, w http.ResponseWriter, r *ht
 			if dc, err := flow.DuplicateCredentials(lf); err == nil && dc != nil {
 				redirectURL = urlx.CopyWithQuery(redirectURL, url.Values{"no_org_ui": {"true"}})
 				s.populateAccountLinkingUI(ctx, lf, usedProviderID, dc.DuplicateIdentifier, dup.AvailableCredentials(), dup.AvailableOIDCProviders())
+				// Remember the verification options on the flow so that a failed
+				// verification attempt can re-render this screen with them intact.
+				dc.AvailableCredentialTypes = dup.AvailableCredentials()
+				dc.AvailableProviders = dup.AvailableOIDCProviders()
+				if err := flow.SetDuplicateCredentials(lf, *dc); err != nil {
+					return err
+				}
 				if err := s.d.LoginFlowPersister().UpdateLoginFlow(ctx, lf); err != nil {
 					return err
 				}
