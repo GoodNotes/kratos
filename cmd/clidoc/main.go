@@ -173,7 +173,7 @@ func init() {
 		"NewInfoSelfServiceLoginCode":                             text.NewInfoSelfServiceLoginCode(),
 		"NewErrorValidationRegistrationRetrySuccessful":           text.NewErrorValidationRegistrationRetrySuccessful(),
 		"NewInfoSelfServiceRegistrationRegisterCode":              text.NewInfoSelfServiceRegistrationRegisterCode(),
-		"NewErrorValidationLoginLinkedCredentialsDoNotMatch":      text.NewErrorValidationLoginLinkedCredentialsDoNotMatch(),
+		"NewErrorValidationLoginLinkedCredentialsDoNotMatch":      text.NewErrorValidationLoginLinkedCredentialsDoNotMatch("{duplicateIdentifier}", []string{"{available_credential_types_list}"}, []string{"{available_oidc_providers_list}"}),
 		"NewErrorValidationAddressUnknown":                        text.NewErrorValidationAddressUnknown(),
 		"NewInfoSelfServiceLoginCodeMFA":                          text.NewInfoSelfServiceLoginCodeMFA(),
 		"NewInfoLoginPassword":                                    text.NewInfoLoginPassword(),

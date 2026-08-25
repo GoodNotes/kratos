@@ -17,6 +17,7 @@ import (
 	"github.com/ory/herodot"
 	"github.com/ory/kratos/continuity"
 	"github.com/ory/kratos/identity"
+	"github.com/ory/kratos/schema"
 	"github.com/ory/kratos/selfservice/flow"
 	"github.com/ory/kratos/selfservice/flow/login"
 	"github.com/ory/kratos/selfservice/flow/registration"
@@ -105,6 +106,17 @@ func (s *Strategy) processLogin(ctx context.Context, w http.ResponseWriter, r *h
 	i, c, err := s.d.PrivilegedIdentityPool().FindByCredentialsIdentifier(ctx, identity.CredentialsTypeOIDC, identity.OIDCUniqueID(provider.Config().ID, claims.Subject))
 	if err != nil {
 		if errors.Is(err, sqlcon.ErrNoRows) {
+			// The user is on the account-linking screen, proving ownership of an existing
+			// account. A subject we have never seen before can never satisfy that proof, so
+			// refuse instead of falling through to registration, which would silently create
+			// a second account and sign the user into it.
+			if dc, dcErr := flow.DuplicateCredentials(loginFlow); dcErr != nil {
+				return nil, s.handleError(ctx, w, r, loginFlow, provider.Config().ID, nil, dcErr)
+			} else if dc != nil {
+				return nil, s.handleError(ctx, w, r, loginFlow, provider.Config().ID, nil,
+					schema.NewLinkedCredentialsDoNotMatch(dc.DuplicateIdentifier, dc.AvailableCredentialTypes, dc.AvailableProviders))
+			}
+
 			// If no account was found we're "manually" creating a new registration flow and redirecting the browser
 			// to that endpoint.
 

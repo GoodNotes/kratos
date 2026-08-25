@@ -344,7 +344,7 @@ func TestLoginExecutor(t *testing.T) {
 						}))
 					}), false, url.Values{})
 					assert.EqualValues(t, http.StatusInternalServerError, res.StatusCode)
-					assert.Equal(t, schema.NewLinkedCredentialsDoNotMatch().Error(), body, "%s", body)
+					assert.Equal(t, schema.NewLinkedCredentialsDoNotMatch("wrong@example.com", nil, nil).Error(), body, "%s", body)
 				})
 			})
 
