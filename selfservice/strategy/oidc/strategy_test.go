@@ -1705,6 +1705,120 @@ func TestStrategy(t *testing.T) {
 				checkCredentialsLinked(res, body, identityID, "secondProvider")
 			})
 		})
+
+		// Proving ownership with an OIDC identity we have never seen must be rejected.
+		// Falling through to registration here would silently create a second account
+		// and sign the user into it, abandoning the link the user asked for.
+		t.Run("case=second login is OIDC with an unknown subject", func(t *testing.T) {
+			existing := "linking-unknown-subject@ory.sh"
+			unknown := "linking-never-seen-before@ory.sh"
+			scope = []string{"openid", "offline"}
+
+			t.Run("step=create OIDC identity", func(t *testing.T) {
+				subject = existing
+				r := newRegistrationFlow(t, returnTS.URL, time.Minute, flow.TypeBrowser)
+				action := assertFormValues(t, r.ID, "secondProvider")
+				res, body := makeRequest(t, "secondProvider", action, url.Values{})
+				assertIdentity(t, res, body)
+				expectTokens(t, "secondProvider", body)
+			})
+
+			subject = existing
+			client := testhelpers.NewClientWithCookieJar(t, nil, nil)
+			loginFlow := newLoginFlow(t, returnTS.URL, time.Minute, flow.TypeBrowser)
+			var linkingLoginFlow struct{ ID string }
+
+			t.Run("step=should fail login and start a new login", func(t *testing.T) {
+				conf.MustSet(ctx, config.ViperKeySelfServiceRegistrationLoginHints, true)
+				res, body := loginWithOIDC(t, client, loginFlow.ID, "valid2")
+				assertUIError(t, res, body, "You tried to sign in with \""+existing+"\", but that email is already used by another account.")
+				linkingLoginFlow.ID = gjson.GetBytes(body, "id").String()
+				assert.NotEqual(t, loginFlow.ID.String(), linkingLoginFlow.ID, "should have started a new flow")
+			})
+
+			// The user picks the provider the screen legitimately offers, but signs in
+			// with a different account at the provider than the one being linked.
+			t.Run("step=should reject an unknown subject instead of registering it", func(t *testing.T) {
+				require.NotEmpty(t, linkingLoginFlow.ID)
+				subject = unknown
+				res, body := loginWithOIDC(t, client, uuid.Must(uuid.FromString(linkingLoginFlow.ID)), "secondProvider")
+				assertUIError(t, res, body, "Linked credentials do not match.")
+
+				// The screen must keep offering the ways the existing account can be
+				// verified, otherwise the user is left with no way to continue.
+				assert.Equal(t,
+					strconv.Itoa(int(text.ErrorValidationLoginLinkedCredentialsDoNotMatch)),
+					gjson.GetBytes(body, "ui.messages.0.id").String(),
+					prettyJSON(t, body),
+				)
+				assert.Equal(t, existing,
+					gjson.GetBytes(body, "ui.messages.0.context.duplicate_identifier").String(),
+					prettyJSON(t, body))
+				assert.NotEmpty(t,
+					gjson.GetBytes(body, "ui.messages.0.context.available_credential_types").Array(),
+					prettyJSON(t, body))
+
+				// No account may be created for the unknown subject.
+				_, _, err := reg.PrivilegedIdentityPool().FindByCredentialsIdentifier(ctx,
+					identity.CredentialsTypeOIDC, identity.OIDCUniqueID("secondProvider", unknown))
+				assert.Error(t, err, "an identity was created for the unknown subject")
+			})
+		})
+
+		// The guard reads the flow's persisted linking context before deciding whether
+		// to register. If that context is corrupted, refuse rather than fall through to
+		// registration: this must fail safe, not fail open.
+		t.Run("case=second login is OIDC with a corrupted linking context", func(t *testing.T) {
+			existing := "linking-corrupted-context@ory.sh"
+			unknown := "linking-corrupted-context-unknown@ory.sh"
+			scope = []string{"openid", "offline"}
+
+			t.Run("step=create OIDC identity", func(t *testing.T) {
+				subject = existing
+				r := newRegistrationFlow(t, returnTS.URL, time.Minute, flow.TypeBrowser)
+				action := assertFormValues(t, r.ID, "secondProvider")
+				res, body := makeRequest(t, "secondProvider", action, url.Values{})
+				assertIdentity(t, res, body)
+				expectTokens(t, "secondProvider", body)
+			})
+
+			subject = existing
+			client := testhelpers.NewClientWithCookieJar(t, nil, nil)
+			loginFlow := newLoginFlow(t, returnTS.URL, time.Minute, flow.TypeBrowser)
+			var linkingLoginFlow struct{ ID string }
+
+			t.Run("step=should fail login and start a new login", func(t *testing.T) {
+				conf.MustSet(ctx, config.ViperKeySelfServiceRegistrationLoginHints, true)
+				res, body := loginWithOIDC(t, client, loginFlow.ID, "valid2")
+				assertUIError(t, res, body, "You tried to sign in with \""+existing+"\", but that email is already used by another account.")
+				linkingLoginFlow.ID = gjson.GetBytes(body, "id").String()
+				assert.NotEqual(t, loginFlow.ID.String(), linkingLoginFlow.ID, "should have started a new flow")
+			})
+
+			t.Run("step=should fail safe instead of registering when the linking context cannot be read", func(t *testing.T) {
+				require.NotEmpty(t, linkingLoginFlow.ID)
+
+				lf, err := reg.LoginFlowPersister().GetLoginFlow(ctx, uuid.Must(uuid.FromString(linkingLoginFlow.ID)))
+				require.NoError(t, err)
+				// A type that cannot decode into flow.DuplicateCredentialsData: this is what
+				// flow.DuplicateCredentials sees as corrupted internal context.
+				lf.SetInternalContext(sqlxx.JSONRawMessage(`{"registration_duplicate_credentials":{"CredentialsType":123}}`))
+				require.NoError(t, reg.LoginFlowPersister().UpdateLoginFlow(ctx, lf))
+
+				subject = unknown
+				res, body := loginWithOIDC(t, client, uuid.Must(uuid.FromString(linkingLoginFlow.ID)), "secondProvider")
+
+				// The corrupted context must not be treated as "no linking pending": the
+				// request is rejected onto the generic error page, not the login/linking UI.
+				assert.Contains(t, res.Request.URL.String(), errTS.URL, "%s", body)
+				assert.Contains(t, string(body), "cannot unmarshal", "%s", body)
+
+				// Above all, no account may be created for the unknown subject.
+				_, _, err = reg.PrivilegedIdentityPool().FindByCredentialsIdentifier(ctx,
+					identity.CredentialsTypeOIDC, identity.OIDCUniqueID("secondProvider", unknown))
+				assert.Error(t, err, "an identity was created for the unknown subject despite a corrupted linking context")
+			})
+		})
 	})
 
 	t.Run("method=TestPopulateSignUpMethod", func(t *testing.T) {
