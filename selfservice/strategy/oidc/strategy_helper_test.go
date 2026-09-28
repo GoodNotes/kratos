@@ -390,16 +390,22 @@ var publicJWKS2 []byte
 
 type claims struct {
 	*jwt.RegisteredClaims
-	Email string `json:"email"`
+	Email    string `json:"email"`
+	Object   string `json:"oid,omitempty"`
+	TenantID string `json:"tid,omitempty"`
 }
 
 func createIdToken(t *testing.T, cl jwt.RegisteredClaims) string {
-	key := &jwk.KeySpec{}
-	require.NoError(t, json.Unmarshal(rawKey, key))
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, &claims{
+	return signIdToken(t, &claims{
 		RegisteredClaims: &cl,
 		Email:            "acme@ory.sh",
 	})
+}
+
+func signIdToken(t *testing.T, cl *claims) string {
+	key := &jwk.KeySpec{}
+	require.NoError(t, json.Unmarshal(rawKey, key))
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, cl)
 	token.Header["kid"] = key.KeyID
 	s, err := token.SignedString(key.Key)
 	require.NoError(t, err)
