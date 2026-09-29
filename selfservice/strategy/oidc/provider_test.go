@@ -7,10 +7,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ory/herodot"
 )
 
 func TestClaimsValidate(t *testing.T) {
@@ -47,11 +52,35 @@ func (t *TestProvider) Verify(_ context.Context, token string) (*Claims, error) 
 	if token == "error" {
 		return nil, fmt.Errorf("stub error")
 	}
+	if token == "bad-request" {
+		return nil, errors.WithStack(herodot.ErrBadRequest.WithReason("stub bad request"))
+	}
 	c := Claims{}
 	if err := json.Unmarshal([]byte(token), &c); err != nil {
 		return nil, err
 	}
 	return &c, nil
+}
+
+func TestProcessIDTokenVerifyErrors(t *testing.T) {
+	r := httptest.NewRequest("POST", "/", nil)
+	s := new(Strategy)
+
+	t.Run("case=keeps a client error from the verifier", func(t *testing.T) {
+		_, err := s.processIDToken(r, new(TestProvider), "bad-request", "")
+		var herr *herodot.DefaultError
+		require.ErrorAs(t, err, &herr)
+		assert.Equal(t, http.StatusBadRequest, herr.StatusCode())
+		assert.Equal(t, "stub bad request", herr.Reason())
+	})
+
+	t.Run("case=wraps any other verifier error as a server error", func(t *testing.T) {
+		_, err := s.processIDToken(r, new(TestProvider), "error", "")
+		var herr *herodot.DefaultError
+		require.ErrorAs(t, err, &herr)
+		assert.Equal(t, http.StatusInternalServerError, herr.StatusCode())
+		assert.Equal(t, "Could not verify id_token", herr.Reason())
+	})
 }
 
 func TestLocale(t *testing.T) {

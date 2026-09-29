@@ -122,6 +122,20 @@ func (m *ProviderMicrosoft) updateSubject(ctx context.Context, claims *Claims, e
 		claims.Subject = user.ID
 	}
 
+	return m.applyObjectIDSubject(claims)
+}
+
+func (m *ProviderMicrosoft) applyObjectIDSubject(claims *Claims) (*Claims, error) {
+	if m.config.SubjectSource != "oid" {
+		return claims, nil
+	}
+
+	// Fail with a scope hint instead of the generic empty-subject error.
+	if claims.Object == "" {
+		return nil, errors.WithStack(herodot.ErrBadRequest.WithReason("The Microsoft ID token has no `oid` claim, which `subject_source: oid` requires. Request the `profile` scope."))
+	}
+
+	claims.Subject = claims.Object
 	return claims, nil
 }
 
@@ -141,7 +155,12 @@ func (p *ProviderMicrosoft) Verify(ctx context.Context, rawIDToken string) (*Cla
 		return nil, err
 	}
 
-	return verifyToken(ctx, keySet, p.config, rawIDToken, issuer)
+	claims, err := verifyToken(ctx, keySet, p.config, rawIDToken, issuer)
+	if err != nil {
+		return nil, err
+	}
+
+	return p.applyObjectIDSubject(claims)
 }
 
 func (p *ProviderMicrosoft) extractIssuerFromIDToken(rawIDToken string) (string, error) {
