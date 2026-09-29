@@ -130,7 +130,7 @@ func (m *ProviderMicrosoft) applyObjectIDSubject(claims *Claims) (*Claims, error
 		return claims, nil
 	}
 
-	// An empty subject would link every such user to one identity.
+	// Fail with a scope hint instead of the generic empty-subject error.
 	if claims.Object == "" {
 		return nil, errors.WithStack(herodot.ErrBadRequest.WithReason("The Microsoft ID token has no `oid` claim, which `subject_source: oid` requires. Request the `profile` scope."))
 	}

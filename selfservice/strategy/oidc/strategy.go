@@ -743,6 +743,10 @@ func (s *Strategy) processIDToken(r *http.Request, provider Provider, idToken, i
 	}
 	claims, err := verifier.Verify(r.Context(), idToken)
 	if err != nil {
+		var herr *herodot.DefaultError
+		if errors.As(err, &herr) && herr.StatusCode() < http.StatusInternalServerError {
+			return nil, err
+		}
 		return nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("Could not verify id_token").WithError(err.Error()))
 	}
 

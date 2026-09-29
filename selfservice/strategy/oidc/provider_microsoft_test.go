@@ -144,6 +144,7 @@ func TestMicrosoftVerify(t *testing.T) {
 		require.Error(t, err)
 		var herr *herodot.DefaultError
 		require.ErrorAs(t, err, &herr)
+		assert.Equal(t, http.StatusBadRequest, herr.StatusCode())
 		assert.Contains(t, herr.Reason(), "`oid` claim")
 	})
 }
@@ -193,6 +194,7 @@ func TestMicrosoftClaims(t *testing.T) {
 		require.Error(t, err)
 		var herr *herodot.DefaultError
 		require.ErrorAs(t, err, &herr)
+		assert.Equal(t, http.StatusBadRequest, herr.StatusCode())
 		assert.Contains(t, herr.Reason(), "`oid` claim")
 	})
 }
