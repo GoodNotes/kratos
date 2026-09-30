@@ -1,8 +1,6 @@
 # syntax = docker/dockerfile:1-experimental
-FROM golang:1.22-bullseye AS builder
-
-RUN apt-get update && apt-get upgrade -y &&\
-  mkdir -p /var/lib/sqlite
+# ABOUTME: Builds the Kratos release image: a static Go binary on distroless static.
+FROM golang:1.26-trixie@sha256:eae2aaa6add2936cbf350dd0d2628b363461542f0c4b3c0b558957e0f2997379 AS builder
 
 WORKDIR /go/src/github.com/ory/kratos
 
@@ -11,8 +9,7 @@ COPY go.sum go.sum
 COPY internal/client-go/go.* internal/client-go/
 
 ENV GO111MODULE on
-ENV CGO_ENABLED 1
-ENV CGO_CPPFLAGS -DSQLITE_DEFAULT_FILE_PERMISSIONS=0600
+ENV CGO_ENABLED 0
 
 RUN go mod download
 
@@ -22,17 +19,15 @@ ARG VERSION
 ARG COMMIT
 ARG BUILD_DATE
 
-RUN --mount=type=cache,target=/root/.cache/go-build go build -tags sqlite \
+RUN --mount=type=cache,target=/root/.cache/go-build go build \
   -ldflags="-X 'github.com/ory/kratos/driver/config.Version=${VERSION}' -X 'github.com/ory/kratos/driver/config.Date=${BUILD_DATE}' -X 'github.com/ory/kratos/driver/config.Commit=${COMMIT}'" \
   -o /usr/bin/kratos
 
 #########################
-FROM gcr.io/distroless/base-nossl-debian12:nonroot AS runner
+# No SQLite (it needs CGO), so the binary is static and the runtime image carries no glibc.
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3 AS runner
 
-COPY --from=builder --chown=nonroot:nonroot /var/lib/sqlite /var/lib/sqlite
 COPY --from=builder --chown=nonroot:nonroot /usr/bin/kratos /usr/bin/kratos
-
-VOLUME /var/lib/sqlite
 
 # Declare the standard ports used by Kratos (4433 for public service endpoint, 4434 for admin service endpoint)
 EXPOSE 4433 4434
