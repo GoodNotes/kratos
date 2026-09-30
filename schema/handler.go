@@ -236,7 +236,7 @@ func (h *Handler) ReadSchema(ctx context.Context, schema *Schema) (src io.ReadCl
 	defer otelx.End(span, &err)
 
 	if schema.URL.Scheme == "file" {
-		src, err = os.Open(schema.URL.Host + schema.URL.Path)
+		src, err = os.Open(schema.URL.Host + schema.URL.Path) //nolint:gosec // G703: schema URL comes from configuration
 		if err != nil {
 			return nil, errors.WithStack(herodot.ErrInternalServerError.WithWrap(err).WithReason("Unable to fetch identity schema."))
 		}

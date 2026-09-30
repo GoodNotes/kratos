@@ -27,7 +27,7 @@ import (
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/bcrypt"
 
-	//nolint:staticcheck
+	//nolint:staticcheck,gosec
 	//lint:ignore SA1019 compatibility for imported passwords
 	"golang.org/x/crypto/md4" //#nosec G501 -- compatibility for imported passwords
 	"golang.org/x/crypto/pbkdf2"
@@ -253,7 +253,7 @@ func CompareFirebaseScrypt(_ context.Context, password []byte, hash []byte) erro
 	}
 
 	cipherText := make([]byte, aes.BlockSize+len(signerKey))
-	stream := cipher.NewCTR(block, cipherText[:aes.BlockSize])
+	stream := cipher.NewCTR(block, cipherText[:aes.BlockSize]) //nolint:gosec // G407: Firebase scrypt verification requires a zero IV
 	stream.XORKeyStream(cipherText[aes.BlockSize:], signerKey)
 	otherHash := cipherText[aes.BlockSize:]
 

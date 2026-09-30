@@ -74,7 +74,7 @@ func newApiKeyStrategy(raw json.RawMessage) (AuthStrategy, error) {
 func (c *apiKeyStrategy) apply(req *retryablehttp.Request) {
 	switch c.in {
 	case "cookie":
-		req.AddCookie(&http.Cookie{Name: c.name, Value: c.value})
+		req.AddCookie(&http.Cookie{Name: c.name, Value: c.value}) //nolint:gosec // G124: cookie of an outgoing request
 	default:
 		req.Header.Set(c.name, c.value)
 	}

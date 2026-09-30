@@ -151,7 +151,7 @@ func NosurfBaseCookieHandler(reg interface {
 		}
 
 		name := CSRFCookieName(reg, r)
-		cookie := http.Cookie{
+		cookie := http.Cookie{ //nolint:gosec // G124: Secure and SameSite come from configuration
 			Name:     name,
 			MaxAge:   nosurf.MaxAge,
 			Path:     reg.Config().CookiePath(r.Context()),

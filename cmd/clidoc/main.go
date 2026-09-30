@@ -243,7 +243,7 @@ func sortMessages() []*text.Message {
 }
 
 func writeMessages(path string, sortedMessages []*text.Message) error {
-	content, err := os.ReadFile(path)
+	content, err := os.ReadFile(path) //nolint:gosec // G703: developer tool writes to a path from its own arguments
 	if err != nil {
 		return err
 	}
@@ -260,7 +260,7 @@ func writeMessages(path string, sortedMessages []*text.Message) error {
 	r := regexp.MustCompile(`(?s)<!-- START MESSAGE TABLE -->(.*?)<!-- END MESSAGE TABLE -->`)
 	result := r.ReplaceAllString(string(content), "<!-- START MESSAGE TABLE -->\n"+w.String()+"\n<!-- END MESSAGE TABLE -->")
 
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o755)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o755) //nolint:gosec // G703: developer tool writes to a path from its own arguments
 	if err != nil {
 		return err
 	}
@@ -279,7 +279,7 @@ func writeMessages(path string, sortedMessages []*text.Message) error {
 func writeMessagesJson(path string, sortedMessages []*text.Message) error {
 	result := codeEncode(sortedMessages)
 
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o755)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o755) //nolint:gosec // G703: developer tool writes to a path from its own arguments
 	if err != nil {
 		return err
 	}

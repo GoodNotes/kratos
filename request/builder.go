@@ -242,5 +242,5 @@ func (b *Builder) readTemplate(ctx context.Context) ([]byte, error) {
 }
 
 func isNilInterface(i interface{}) bool {
-	return i == nil || (reflect.ValueOf(i).Kind() == reflect.Ptr && reflect.ValueOf(i).IsNil())
+	return i == nil || (reflect.ValueOf(i).Kind() == reflect.Pointer && reflect.ValueOf(i).IsNil())
 }
