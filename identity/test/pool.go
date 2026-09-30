@@ -382,7 +382,7 @@ func TestPool(ctx context.Context, p persistence.Persister, m *identity.Manager,
 					identities[i] = NewTestIdentity(4, "persister-create-multiple-2", 100+i)
 				}
 				for i := range identities[60:] {
-					identities[60+i] = NewTestIdentity(4, "persister-create-multiple-2", i)
+					identities[60+i] = NewTestIdentity(4, "persister-create-multiple-2", i) //nolint:gosec // G602: identities has 100 elements
 				}
 				err := p.CreateIdentities(ctx, identities...)
 				if dbname == "mysql" {
