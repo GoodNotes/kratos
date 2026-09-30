@@ -1,0 +1,79 @@
+# ABOUTME: Builds the multi-arch Kratos image for a fork release tag and pushes it to public ECR.
+name: Publish image
+
+on:
+  push:
+    tags:
+      - "v*-gn-v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  IMAGE: public.ecr.aws/f2w7e5y1/goodnotes/kratos
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "BUILD_DATE=$(git log -1 --format=%cI)" >> "$GITHUB_ENV"
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ECR_PUBLIC_ROLE_ARN }}
+          aws-region: us-east-1
+      - uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
+      - uses: docker/setup-buildx-action@v3
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .docker/Dockerfile-build
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ env.BUILD_DATE }}
+          outputs: |
+            type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+      - run: mkdir -p /tmp/digests && touch "/tmp/digests/${DIGEST#sha256:}"
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.runner }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+
+  merge:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ECR_PUBLIC_ROLE_ARN }}
+          aws-region: us-east-1
+      - uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
+      - uses: docker/setup-buildx-action@v3
+      - working-directory: /tmp/digests
+        run: |
+          refs=(); for d in *; do refs+=("$IMAGE@sha256:$d"); done
+          docker buildx imagetools create -t "$IMAGE:$GITHUB_REF_NAME" "${refs[@]}"
+      - run: docker buildx imagetools inspect "$IMAGE:$GITHUB_REF_NAME"
