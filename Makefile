@@ -105,9 +105,10 @@ test-coverage-next: .bin/go-acc .bin/goveralls
 	go tool covdata textfmt -i=./coverage -o coverage.new.out
 
 # Generates the SDK
+# go-swagger v0.31.0 panics on type aliases; Go 1.27 removes gotypesalias, so replace go-swagger before that toolchain move.
 .PHONY: sdk
 sdk: .bin/swagger .bin/ory node_modules
-	swagger generate spec -m -o spec/swagger.json \
+	GODEBUG=gotypesalias=0 swagger generate spec -m -o spec/swagger.json \
 		-c github.com/ory/kratos \
 		-c github.com/ory/x/healthx \
 		-c github.com/ory/x/crdbx \

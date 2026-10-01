@@ -31,7 +31,7 @@ import (
 	templates "github.com/ory/kratos/courier/template/email"
 	"github.com/ory/kratos/driver/config"
 	"github.com/ory/kratos/internal"
-	"github.com/ory/kratos/x"
+	"github.com/ory/kratos/internal/testhelpers"
 	gomail "github.com/ory/mail/v3"
 )
 
@@ -115,7 +115,7 @@ func TestQueueEmail(t *testing.T) {
 		t.SkipNow()
 	}
 
-	smtp, api, err := x.RunTestSMTP()
+	smtp, api, err := testhelpers.RunTestSMTP()
 	require.NoError(t, err)
 	t.Logf("SMTP URL: %s", smtp)
 	t.Logf("API URL: %s", api)
