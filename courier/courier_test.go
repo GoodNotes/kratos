@@ -6,10 +6,10 @@ package courier_test
 import (
 	"testing"
 
-	"github.com/ory/kratos/x"
+	"github.com/ory/kratos/internal/testhelpers"
 )
 
 func TestMain(m *testing.M) {
 	m.Run()
-	x.CleanUpTestSMTP()
+	testhelpers.CleanUpTestSMTP()
 }

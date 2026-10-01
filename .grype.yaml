@@ -1,8 +1,0 @@
-#only-fixed: true
-ignore:
-  - vulnerability: GHSA-c5pj-mqfh-rvc3 # https://github.com/advisories/GHSA-c5pj-mqfh-rvc3
-  - vulnerability: CVE-2015-5237
-  - vulnerability: CVE-2022-30065
-  - vulnerability: CVE-2023-2650
-  - vulnerability: CVE-2023-4813
-  - vulnerability: CVE-2023-4806
