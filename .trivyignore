@@ -1,3 +1,5 @@
 CVE-2022-30065
 CVE-2024-2961
 CVE-2023-2650
+# Not affected: the flaw is in ory/x keysetpagination_v2 (Kratos v25.4.0+), absent from ory/x v0.0.660; courier/handler_test.go pins it.
+CVE-2026-33503
