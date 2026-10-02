@@ -144,13 +144,11 @@ func TestHandler(t *testing.T) {
 				}
 			})
 			t.Run("case=should not put page token content into the SQL statement", func(t *testing.T) {
-				createdAt := time.Now().Add(time.Hour).UTC().Format("2006-01-02 15:04:05.99999-07:00")
-
 				for name, token := range map[string]keysetpagination.MapPageToken{
 					"column name": {
 						"id":             uuid.Nil.String(),
-						"created_at":     createdAt,
-						"no_such_column": createdAt,
+						"created_at":     "2200-12-31 23:59:59",
+						"no_such_column": "x",
 					},
 					"column value": {
 						"id":         uuid.Nil.String(),
