@@ -13,7 +13,7 @@ jobs:
   automate:
     if: github.event.pull_request.head.repo.fork == false
     name: Add issue to project
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: ory-corp/planning-automation-action@v0.1

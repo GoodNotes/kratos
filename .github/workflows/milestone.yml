@@ -12,7 +12,7 @@ jobs:
   milestone:
     if: github.repository_owner == 'ory'
     name: Generate and Publish Milestone Document
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
