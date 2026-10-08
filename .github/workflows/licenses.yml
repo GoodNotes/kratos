@@ -14,7 +14,7 @@ on:
 jobs:
   licenses:
     name: License compliance
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     steps:
       - name: Install script
         uses: ory/ci/licenses/setup@master

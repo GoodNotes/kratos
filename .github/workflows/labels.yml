@@ -13,7 +13,7 @@ jobs:
   milestone:
     if: github.repository_owner == 'ory'
     name: Synchronize Issue Labels
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2

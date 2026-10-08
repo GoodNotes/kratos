@@ -15,7 +15,7 @@ concurrency:
 jobs:
   sdk-generate:
     name: Generate SDKs
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     steps:
       - uses: ory/ci/sdk/generate@master
         with:
@@ -23,7 +23,7 @@ jobs:
 
   test:
     name: Run tests and lints
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     needs:
       - sdk-generate
     services:
@@ -109,7 +109,7 @@ jobs:
 
   test-e2e:
     name: Run end-to-end tests
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     needs:
       - sdk-generate
     services:
@@ -223,7 +223,7 @@ jobs:
 
   test-e2e-playwright:
     name: Run Playwright end-to-end tests
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     needs:
       - sdk-generate
     services:
@@ -342,7 +342,7 @@ jobs:
             test/e2e/playwright-report/
 
   docs-cli:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     name: Build CLI docs
     needs:
       - test
@@ -355,7 +355,7 @@ jobs:
 
   changelog:
     name: Generate changelog
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     if: ${{ github.ref_type == 'tag' || github.ref_name == 'master' }}
     needs:
       - test
@@ -367,7 +367,7 @@ jobs:
 
   sdk-release:
     name: Release SDKs
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     if: ${{ github.ref_type == 'tag' }}
     needs:
       - test
@@ -382,7 +382,7 @@ jobs:
 
   release:
     name: Generate release
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     if: ${{ github.ref_type == 'tag' }}
     needs:
       - test
@@ -399,7 +399,7 @@ jobs:
 
   render-version-schema:
     name: Render version schema
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     if: ${{ github.ref_type == 'tag' }}
     needs:
       - release
@@ -411,7 +411,7 @@ jobs:
 
   newsletter-draft:
     name: Draft newsletter
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     if: ${{ github.ref_type == 'tag' }}
     needs:
       - release
@@ -426,7 +426,7 @@ jobs:
 
   slack-approval-notification:
     name: Pending approval Slack notification
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     if: ${{ github.ref_type == 'tag' }}
     needs:
       - newsletter-draft
@@ -437,7 +437,7 @@ jobs:
 
   newsletter-send:
     name: Send newsletter
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest
     needs:
       - newsletter-draft
     if: ${{ github.ref_type == 'tag' }}
