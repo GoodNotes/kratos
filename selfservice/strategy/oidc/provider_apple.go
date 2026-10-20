@@ -160,7 +160,7 @@ func (a *ProviderApple) Verify(ctx context.Context, rawIDToken string) (*Claims,
 	keySet := oidc.NewRemoteKeySet(ctx, a.JWKSUrl)
 
 	ctx = oidc.ClientContext(ctx, a.reg.HTTPClient(ctx).HTTPClient)
-	return verifyToken(ctx, keySet, a.config, rawIDToken, issuerUrlApple, false)
+	return verifyToken(ctx, keySet, a.config, rawIDToken, issuerUrlApple)
 }
 
 var _ NonceValidationSkipper = new(ProviderApple)

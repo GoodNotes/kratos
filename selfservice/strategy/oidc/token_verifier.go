@@ -11,7 +11,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 )
 
-func verifyToken(ctx context.Context, keySet oidc.KeySet, config *Configuration, rawIDToken, issuerURL string, preserveRawClaims bool) (*Claims, error) {
+func verifyToken(ctx context.Context, keySet oidc.KeySet, config *Configuration, rawIDToken, issuerURL string) (*Claims, error) {
 	tokenAudiences := append([]string{config.ClientID}, config.AdditionalIDTokenAudiences...)
 	var token *oidc.IDToken
 	err := fmt.Errorf("no audience matched the token's audience")
@@ -35,17 +35,19 @@ func verifyToken(ctx context.Context, keySet oidc.KeySet, config *Configuration,
 		return nil, fmt.Errorf("token audience didn't match allowed audiences: %+v %w", tokenAudiences, err)
 	}
 	claims := &Claims{}
+	var rawClaims map[string]any
+
+	if token == nil {
+		return nil, fmt.Errorf("token is nil")
+	}
+
 	if err := token.Claims(claims); err != nil {
 		return nil, err
 	}
-	if preserveRawClaims {
-		// Decode the verified token, matching the browser flow's mapper input.
-		// Providers opt in so existing callers keep their claims shape.
-		var rawClaims map[string]interface{}
-		if err := token.Claims(&rawClaims); err != nil {
-			return nil, err
-		}
-		claims.RawClaims = rawClaims
+	if err = token.Claims(&rawClaims); err != nil {
+		return nil, err
 	}
+	claims.RawClaims = rawClaims
+
 	return claims, nil
 }
