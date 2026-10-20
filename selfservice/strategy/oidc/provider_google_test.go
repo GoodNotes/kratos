@@ -101,6 +101,7 @@ func TestGoogleVerify(t *testing.T) {
 		assert.Equal(t, "acme@ory.sh", c.Email)
 		assert.Equal(t, "acme@ory.sh", c.Subject)
 		assert.Equal(t, "https://accounts.google.com", c.Issuer)
+		assert.Equal(t, "acme@ory.sh", c.RawClaims["sub"])
 	})
 
 	t.Run("case=fails due to client_id mismatch", func(t *testing.T) {

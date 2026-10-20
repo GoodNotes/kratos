@@ -390,9 +390,10 @@ var publicJWKS2 []byte
 
 type claims struct {
 	*jwt.RegisteredClaims
-	Email    string `json:"email"`
-	Object   string `json:"oid,omitempty"`
-	TenantID string `json:"tid,omitempty"`
+	Email    string      `json:"email"`
+	Object   string      `json:"oid,omitempty"`
+	TenantID string      `json:"tid,omitempty"`
+	XmsEdov  interface{} `json:"xms_edov,omitempty"`
 }
 
 func createIdToken(t *testing.T, cl jwt.RegisteredClaims) string {

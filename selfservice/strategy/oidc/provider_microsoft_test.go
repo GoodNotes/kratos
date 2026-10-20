@@ -5,6 +5,7 @@ package oidc_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -74,6 +75,58 @@ func TestMicrosoftVerify(t *testing.T) {
 		assert.Equal(t, "acme@ory.sh", c.Email)
 		assert.Equal(t, "acme@ory.sh", c.Subject)
 		assert.Equal(t, issuerFor(tenantA), c.Issuer)
+	})
+
+	t.Run("case=preserves verified raw claims for the mapper", func(t *testing.T) {
+		for _, tc := range []struct {
+			name  string
+			value interface{}
+		}{
+			{name: "boolean true", value: true},
+			{name: "boolean false", value: false},
+			{name: "string one", value: "1"},
+			{name: "string zero", value: "0"},
+			{name: "string true", value: "true"},
+			{name: "string false", value: "false"},
+			{name: "number one", value: float64(1)},
+			{name: "number zero", value: float64(0)},
+			{name: "absent"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				cl := makeClaimsWithRawClaims(issuerFor(tenantA), tenantA, tc.value)
+				c, err := newProvider(t, &oidc.Configuration{
+					Tenant: tenantA, SubjectSource: "oid",
+				}).Verify(context.Background(), signIdToken(t, cl))
+				require.NoError(t, err)
+				require.NotEmpty(t, c.RawClaims)
+
+				// The mapper receives the JSON-encoded Claims object, not the JWT.
+				encoded, err := json.Marshal(c)
+				require.NoError(t, err)
+				var mapperClaims map[string]interface{}
+				require.NoError(t, json.Unmarshal(encoded, &mapperClaims))
+				raw := mapperClaims["raw_claims"].(map[string]interface{})
+				if tc.value == nil {
+					assert.NotContains(t, raw, "xms_edov")
+				} else {
+					assert.Equal(t, tc.value, raw["xms_edov"])
+				}
+				assert.Equal(t, cl.Object, c.Subject)
+				assert.Equal(t, cl.Subject, raw["sub"])
+				assert.Equal(t, cl.Object, raw["oid"])
+				assert.Equal(t, cl.Email, c.Email)
+				assert.Equal(t, cl.TenantID, raw["tid"])
+			})
+		}
+	})
+
+	t.Run("case=rejects expired tokens even with xms_edov", func(t *testing.T) {
+		cl := makeClaimsWithRawClaims(issuerFor(tenantA), tenantA, "1")
+		cl.ExpiresAt = jwt.NewNumericDate(time.Now().Add(-time.Hour))
+		c, err := newProvider(t, &oidc.Configuration{Tenant: tenantA}).Verify(context.Background(), signIdToken(t, cl))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "token is expired")
+		assert.Nil(t, c)
 	})
 
 	t.Run("case=fails due to client_id mismatch", func(t *testing.T) {
@@ -221,4 +274,36 @@ func TestMicrosoftClaims(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, herr.StatusCode())
 		assert.Contains(t, herr.Reason(), "`oid` claim")
 	})
+
+	t.Run("case=browser and native expose the same verified claims", func(t *testing.T) {
+		for _, value := range []interface{}{true, false, "1", "0", float64(1), nil} {
+			cl := makeClaimsWithRawClaims(issuer, tenant, value)
+			cl.Audience = jwt.ClaimStrings{"foo"}
+			raw := signIdToken(t, cl)
+			exchange := (&oauth2.Token{AccessToken: "foo"}).WithExtra(map[string]interface{}{"id_token": raw})
+			browserClaims, err := provider.Claims(context.Background(), exchange, url.Values{})
+			require.NoError(t, err)
+
+			native := provider.(*oidc.ProviderMicrosoft)
+			native.JWKSUrl = issuer + "/keys"
+			nativeClaims, err := native.Verify(context.Background(), raw)
+			require.NoError(t, err)
+			assert.Equal(t, browserClaims, nativeClaims)
+		}
+	})
+}
+
+func makeClaimsWithRawClaims(issuer, tenant string, xmsEdov interface{}) *claims {
+	return &claims{
+		RegisteredClaims: &jwt.RegisteredClaims{
+			Issuer:    issuer,
+			Subject:   "pairwise-sub",
+			Audience:  jwt.ClaimStrings{"com.example.app"},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		},
+		Email:    "acme@ory.sh",
+		Object:   "00000000-0000-0000-0000-00000000c0de",
+		TenantID: tenant,
+		XmsEdov:  xmsEdov,
+	}
 }
