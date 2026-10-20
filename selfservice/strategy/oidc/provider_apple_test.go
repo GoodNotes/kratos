@@ -81,6 +81,7 @@ func TestAppleVerify(t *testing.T) {
 		assert.Equal(t, "acme@ory.sh", c.Email)
 		assert.Equal(t, "acme@ory.sh", c.Subject)
 		assert.Equal(t, "https://appleid.apple.com", c.Issuer)
+		assert.Nil(t, c.RawClaims)
 	})
 
 	t.Run("case=fails due to client_id mismatch", func(t *testing.T) {

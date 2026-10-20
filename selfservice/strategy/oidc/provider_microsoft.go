@@ -162,7 +162,8 @@ func (p *ProviderMicrosoft) Verify(ctx context.Context, rawIDToken string) (*Cla
 
 	ctx = gooidc.ClientContext(ctx, p.reg.HTTPClient(ctx).HTTPClient)
 	keySet := gooidc.NewRemoteKeySet(ctx, p.JWKSUrl)
-	claims, err := verifyToken(ctx, keySet, p.config, rawIDToken, "https://login.microsoftonline.com/"+tenantID.String()+"/v2.0")
+	// Microsoft mappers need provider-specific claims such as xms_edov.
+	claims, err := verifyToken(ctx, keySet, p.config, rawIDToken, "https://login.microsoftonline.com/"+tenantID.String()+"/v2.0", true)
 	if err != nil {
 		return nil, err
 	}
