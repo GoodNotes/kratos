@@ -17,6 +17,7 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/dgraph-io/ristretto"
 	"github.com/gobuffalo/pop/v6"
+	"github.com/gofrs/uuid"
 	"github.com/gorilla/sessions"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/luna-duclos/instrumentedsql"
@@ -643,6 +644,14 @@ func (m *RegistryDefault) Init(ctx context.Context, ctxer contextx.Contextualize
 		m.identitySchemaProvider = o.replaceIdentitySchemaProvider(m)
 	}
 
+	var nid uuid.UUID
+	if !o.skipNetworkInit {
+		var err error
+		if nid, err = m.configuredNetworkID(ctx); err != nil {
+			return err
+		}
+	}
+
 	bc := backoff.NewExponentialBackOff()
 	bc.MaxElapsedTime = time.Minute * 5
 	bc.Reset()
@@ -697,12 +706,16 @@ func (m *RegistryDefault) Init(ctx context.Context, ctxer contextx.Contextualize
 			return nil
 		}
 
-		net, err := p.DetermineNetwork(ctx)
-		if err != nil {
-			m.Logger().WithError(err).Warnf("Unable to determine network, retrying.")
+		net, err := p.NetworkByID(ctx, nid)
+		if errors.Is(err, sqlcon.ErrNoRows) {
+			// backoff v2 detects a permanent error only by type assertion, so it must not be wrapped.
+			return backoff.Permanent(errors.Errorf("config value %q names network %s, which is not in table networks", config.ViperKeyNetworkID, nid))
+		} else if err != nil {
+			m.Logger().WithError(err).Warnf("Unable to load network, retrying.")
 			return err
 		}
 
+		m.Logger().WithField("network_id", net.ID.String()).Info("Using the network from config.")
 		m.persister = p.WithNetworkID(net.ID)
 		return nil
 	}, bc)
@@ -716,6 +729,40 @@ func (m *RegistryDefault) Init(ctx context.Context, ctxer contextx.Contextualize
 		}
 	}
 	return nil
+}
+
+func (m *RegistryDefault) configuredNetworkID(ctx context.Context) (uuid.UUID, error) {
+	nid, err := parseNetworkID(config.ViperKeyNetworkID, m.Config().NetworkID(ctx))
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	raw := m.Config().ForbiddenNetworkID(ctx)
+	if raw == "" {
+		return nid, nil
+	}
+	forbidden, err := parseNetworkID(config.ViperKeyForbiddenNetworkID, raw)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if nid == forbidden {
+		return uuid.Nil, errors.Errorf("config value %q equals config value %q: this release must not use network %s", config.ViperKeyNetworkID, config.ViperKeyForbiddenNetworkID, nid)
+	}
+	return nid, nil
+}
+
+func parseNetworkID(key, raw string) (uuid.UUID, error) {
+	if raw == "" {
+		return uuid.Nil, errors.Errorf("required config value %q was not set", key)
+	}
+	id, err := uuid.FromString(raw)
+	if err != nil {
+		return uuid.Nil, errors.Errorf("config value %q is not a UUID: %q", key, raw)
+	}
+	if id == uuid.Nil {
+		return uuid.Nil, errors.Errorf("config value %q must not be the nil UUID", key)
+	}
+	return id, nil
 }
 
 func (m *RegistryDefault) SetPersister(p persistence.Persister) {

@@ -55,6 +55,8 @@ const (
 	DefaultCipherAlgorithm                                   = "noop"
 	UnknownVersion                                           = "unknown version"
 	ViperKeyDSN                                              = "dsn"
+	ViperKeyNetworkID                                        = "network.id"
+	ViperKeyForbiddenNetworkID                               = "network.forbidden_id"
 	ViperKeyCourierSMTPURL                                   = "courier.smtp.connection_uri"
 	ViperKeyCourierSMTPClientCertPath                        = "courier.smtp.client_cert_path"
 	ViperKeyCourierSMTPClientKeyPath                         = "courier.smtp.client_key_path"
@@ -656,6 +658,14 @@ func (p *Config) DSN(ctx context.Context) string {
 
 	p.l.Fatal("dsn must be set")
 	return ""
+}
+
+func (p *Config) NetworkID(ctx context.Context) string {
+	return p.GetProvider(ctx).String(ViperKeyNetworkID)
+}
+
+func (p *Config) ForbiddenNetworkID(ctx context.Context) string {
+	return p.GetProvider(ctx).String(ViperKeyForbiddenNetworkID)
 }
 
 func (p *Config) DisableAPIFlowEnforcement(ctx context.Context) bool {

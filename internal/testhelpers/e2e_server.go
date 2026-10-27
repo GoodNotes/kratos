@@ -23,9 +23,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid"
+
 	"github.com/ory/kratos/driver"
+	"github.com/ory/kratos/driver/config"
 	"github.com/ory/x/dbal"
 	"github.com/ory/x/jsonnetsecure"
+	"github.com/ory/x/networkx"
+	"github.com/ory/x/servicelocatorx"
 
 	"golang.org/x/sync/errgroup"
 
@@ -72,10 +77,12 @@ func startE2EServerOnly(t *testing.T, configFile string, isTLS bool, configOptio
 	dbt, err := os.MkdirTemp(os.TempDir(), "ory-kratos-e2e-examples-*")
 	require.NoError(t, err)
 	dsn := "sqlite://" + filepath.Join(dbt, "db.sqlite") + "?_fk=true&mode=rwc"
+	nid := uuid.Must(uuid.NewV4())
 
 	ctx := configx.ContextWithConfigOptions(
 		context.Background(),
 		configx.WithValue("dsn", dsn),
+		configx.WithValue(config.ViperKeyNetworkID, nid.String()),
 		configx.WithValue("dev", true),
 		configx.WithValue("log.level", "error"),
 		configx.WithValue("log.leak_sensitive_values", true),
@@ -103,6 +110,11 @@ func startE2EServerOnly(t *testing.T, configFile string, isTLS bool, configOptio
 	t.Log("Starting migrations...")
 	_ = executor.ExecNoErr(t, "migrate", "sql", dsn, "--yes")
 	t.Logf("Migration done")
+
+	migrated, err := driver.New(ctx, os.Stderr, servicelocatorx.NewOptions(), []driver.RegistryOption{driver.SkipNetworkInit},
+		[]configx.OptionModifier{configx.WithValue("dsn", dsn), configx.SkipValidation()})
+	require.NoError(t, err)
+	require.NoError(t, migrated.Persister().GetConnection(ctx).Create(&networkx.Network{ID: nid}))
 
 	t.Log("Starting server...")
 	stdOut, stdErr := &bytes.Buffer{}, &bytes.Buffer{}

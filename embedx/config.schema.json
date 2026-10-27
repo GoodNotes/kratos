@@ -2023,6 +2023,26 @@
         "sqlite:///var/lib/sqlite/db.sqlite?_fk=true&mode=rwc"
       ]
     },
+    "network": {
+      "type": "object",
+      "title": "Network",
+      "description": "Selects the row in table `networks` that scopes all data of this process. Every command except `migrate` refuses to start when `id` is not set or names no row.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Network ID",
+          "description": "The ID of an existing row in table `networks`."
+        },
+        "forbidden_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Forbidden Network ID",
+          "description": "The process refuses to start when `id` equals this value."
+        }
+      },
+      "additionalProperties": false
+    },
     "courier": {
       "type": "object",
       "title": "Courier configuration",
