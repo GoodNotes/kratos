@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/base64"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -28,8 +29,10 @@ import (
 )
 
 func TestInitNetworkFromConfig(t *testing.T) {
+	t.Run("config errors refuse before the database retry", testConfigErrorsRefuseBeforeRetry)
+
 	t.Run("db=sqlite", func(t *testing.T) {
-		testInitNetworkFromConfig(t, dbal.NewSQLiteTestDatabase(t))
+		testInitNetworkFromConfig(t, "sqlite://"+filepath.Join(t.TempDir(), "db.sqlite")+"?_fk=true&mode=rwc")
 	})
 
 	t.Run("db=cockroach", func(t *testing.T) {
@@ -37,6 +40,24 @@ func TestInitNetworkFromConfig(t *testing.T) {
 			t.Skip("skipping testing in short mode")
 		}
 		testInitNetworkFromConfig(t, dockertest.RunTestCockroachDBWithVersion(t, "latest-v23.1"))
+	})
+
+	t.Run("db=memory", func(t *testing.T) {
+		ctx := context.Background()
+		nid := uuid.Must(uuid.NewV4())
+
+		reg, err := newRegistry(ctx, map[string]interface{}{
+			config.ViperKeyDSN:       dbal.NewSQLiteTestDatabase(t),
+			config.ViperKeyNetworkID: nid.String(),
+		})
+		require.NoError(t, err, "a memory database lives only in this process, so nothing else can seed its network")
+		assert.Equal(t, nid, reg.Persister().NetworkID(ctx))
+
+		n, err := reg.Persister().(interface {
+			NetworkByID(context.Context, uuid.UUID) (*networkx.Network, error)
+		}).NetworkByID(ctx, nid)
+		require.NoError(t, err)
+		assert.Equal(t, nid, n.ID)
 	})
 }
 
@@ -49,6 +70,60 @@ func countNetworks(t *testing.T, c *pop.Connection) int {
 	n, err := c.Count(&networkx.Network{})
 	require.NoError(t, err)
 	return n
+}
+
+func testConfigErrorsRefuseBeforeRetry(t *testing.T) {
+	ctx := context.Background()
+	// Nothing listens on port 1, so any database call would retry for minutes.
+	unreachable := "postgres://kratos:secret@127.0.0.1:1/kratos?sslmode=disable"
+	valid := uuid.Must(uuid.NewV4()).String()
+
+	for _, tc := range []struct {
+		name   string
+		values map[string]interface{}
+		error  string
+	}{
+		{
+			name:   "key missing",
+			values: map[string]interface{}{},
+			error:  `required config value "network.id" was not set`,
+		},
+		{
+			name:   "key not a UUID",
+			values: map[string]interface{}{config.ViperKeyNetworkID: "not-a-uuid"},
+			error:  `config value "network.id" is not a UUID: "not-a-uuid"`,
+		},
+		{
+			name:   "key is the nil UUID",
+			values: map[string]interface{}{config.ViperKeyNetworkID: uuid.Nil.String()},
+			error:  `config value "network.id" must not be the nil UUID`,
+		},
+		{
+			name:   "key equals the forbidden key",
+			values: map[string]interface{}{config.ViperKeyNetworkID: valid, config.ViperKeyForbiddenNetworkID: valid},
+			error:  `config value "network.id" equals config value "network.forbidden_id": this release must not use network ` + valid,
+		},
+		{
+			name:   "forbidden key not a UUID",
+			values: map[string]interface{}{config.ViperKeyNetworkID: valid, config.ViperKeyForbiddenNetworkID: "classic"},
+			error:  `config value "network.forbidden_id" is not a UUID: "classic"`,
+		},
+		{
+			name:   "forbidden key is the nil UUID",
+			values: map[string]interface{}{config.ViperKeyNetworkID: valid, config.ViperKeyForbiddenNetworkID: uuid.Nil.String()},
+			error:  `config value "network.forbidden_id" must not be the nil UUID`,
+		},
+	} {
+		t.Run("case="+tc.name, func(t *testing.T) {
+			tc.values[config.ViperKeyDSN] = unreachable
+
+			start := time.Now()
+			_, err := newRegistry(ctx, tc.values)
+			require.Error(t, err)
+			assert.Equal(t, tc.error, err.Error())
+			assert.Less(t, time.Since(start), 10*time.Second, "a config error must not wait for the database retry")
+		})
+	}
 }
 
 func testInitNetworkFromConfig(t *testing.T, dsn string) {
@@ -64,52 +139,17 @@ func testInitNetworkFromConfig(t *testing.T, dsn string) {
 	require.NoError(t, conn.Create(&older))
 	require.NoError(t, conn.Create(&newer))
 
-	for _, tc := range []struct {
-		name     string
-		values   map[string]interface{}
-		errorHas string
-	}{
-		{name: "key missing", values: map[string]interface{}{}, errorHas: config.ViperKeyNetworkID},
-		{name: "key not a UUID", values: map[string]interface{}{config.ViperKeyNetworkID: "not-a-uuid"}, errorHas: "not-a-uuid"},
-		{name: "key is the nil UUID", values: map[string]interface{}{config.ViperKeyNetworkID: uuid.Nil.String()}, errorHas: config.ViperKeyNetworkID},
-		{name: "key names no row", values: map[string]interface{}{config.ViperKeyNetworkID: uuid.Must(uuid.NewV4()).String()}, errorHas: "networks"},
-		{
-			name: "key equals the forbidden key",
-			values: map[string]interface{}{
-				config.ViperKeyNetworkID:          newer.ID.String(),
-				config.ViperKeyForbiddenNetworkID: newer.ID.String(),
-			},
-			errorHas: config.ViperKeyForbiddenNetworkID,
-		},
-		{
-			name: "forbidden key not a UUID",
-			values: map[string]interface{}{
-				config.ViperKeyNetworkID:          newer.ID.String(),
-				config.ViperKeyForbiddenNetworkID: "classic",
-			},
-			errorHas: "classic",
-		},
-		{
-			name: "forbidden key is the nil UUID",
-			values: map[string]interface{}{
-				config.ViperKeyNetworkID:          newer.ID.String(),
-				config.ViperKeyForbiddenNetworkID: uuid.Nil.String(),
-			},
-			errorHas: config.ViperKeyForbiddenNetworkID,
-		},
-	} {
-		t.Run("case="+tc.name, func(t *testing.T) {
-			before := countNetworks(t, conn)
-			tc.values[config.ViperKeyDSN] = dsn
+	t.Run("case=key names no row", func(t *testing.T) {
+		before := countNetworks(t, conn)
+		unknown := uuid.Must(uuid.NewV4())
 
-			start := time.Now()
-			_, err := newRegistry(ctx, tc.values)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tc.errorHas)
-			assert.Less(t, time.Since(start), 30*time.Second, "a config error must not wait for the database retry")
-			assert.Equal(t, before, countNetworks(t, conn), "a refused start must not create a network")
-		})
-	}
+		start := time.Now()
+		_, err := newRegistry(ctx, map[string]interface{}{config.ViperKeyDSN: dsn, config.ViperKeyNetworkID: unknown.String()})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `config value "network.id" names network `+unknown.String()+", which is not in table networks")
+		assert.Less(t, time.Since(start), 30*time.Second, "a missing row must not wait for the database retry")
+		assert.Equal(t, before, countNetworks(t, conn), "a refused start must not create a network")
+	})
 
 	for _, tc := range []struct {
 		name   string

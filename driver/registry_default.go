@@ -62,6 +62,7 @@ import (
 	"github.com/ory/x/jsonnetsecure"
 	"github.com/ory/x/jwksx"
 	"github.com/ory/x/logrusx"
+	"github.com/ory/x/networkx"
 	"github.com/ory/x/otelx"
 	otelsql "github.com/ory/x/otelx/sql"
 	"github.com/ory/x/popx"
@@ -693,7 +694,8 @@ func (m *RegistryDefault) Init(ctx context.Context, ctxer contextx.Contextualize
 		}
 
 		// if dsn is memory we have to run the migrations on every start
-		if dbal.IsMemorySQLite(m.Config().DSN(ctx)) || m.Config().DSN(ctx) == "memory" {
+		isMemory := dbal.IsMemorySQLite(m.Config().DSN(ctx)) || m.Config().DSN(ctx) == "memory"
+		if isMemory {
 			m.Logger().Infoln("Ory Kratos is running migrations on every startup as DSN is memory. This means your data is lost when Kratos terminates.")
 			if err := p.MigrateUp(ctx); err != nil {
 				m.Logger().WithError(err).Warnf("Unable to run migrations, retrying.")
@@ -707,6 +709,12 @@ func (m *RegistryDefault) Init(ctx context.Context, ctxer contextx.Contextualize
 		}
 
 		net, err := p.NetworkByID(ctx, nid)
+		if errors.Is(err, sqlcon.ErrNoRows) && isMemory {
+			// Only this process can reach a memory database, so nothing else can seed its network.
+			m.Logger().WithField("network_id", nid.String()).Warn("Inserting the network from config, because the DSN is a memory database. This happens only for a memory DSN.")
+			net = &networkx.Network{ID: nid}
+			err = p.GetConnection(ctx).Create(net)
+		}
 		if errors.Is(err, sqlcon.ErrNoRows) {
 			// backoff v2 detects a permanent error only by type assertion, so it must not be wrapped.
 			return backoff.Permanent(errors.Errorf("config value %q names network %s, which is not in table networks", config.ViperKeyNetworkID, nid))
