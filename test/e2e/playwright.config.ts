@@ -47,12 +47,14 @@ export default defineConfig({
       command: [
         "cp test/e2e/playwright/kratos.base-config.json test/e2e/playwright/kratos.config.json",
         "go run -tags sqlite,json1 . migrate sql -e --yes",
+        "go run -tags sqlite,json1 ./test/e2e/seed-network",
         "go run -tags sqlite,json1 . serve --watch-courier --dev -c test/e2e/playwright/kratos.config.json",
       ].join(" && "),
       cwd: "../..",
       url: "http://localhost:4433/health/ready",
       env: {
         DSN: dbToDsn(),
+        NETWORK_ID: "3df92ae5-e1ac-4087-b8c2-3652ecda4c4f",
         COURIER_SMTP_CONNECTION_URI:
           "smtp://localhost:8026/?disable_starttls=true",
       },

@@ -22,6 +22,7 @@ export DEV_DISABLE_API_FLOW_ENFORCEMENT=true
 export COOKIE_SECRET=kweifawskf23weas
 export CSRF_COOKIE_NAME=node_csrf_token
 export CSRF_COOKIE_SECRET=lkaw9oe8isedrhq2
+export NETWORK_ID=3df92ae5-e1ac-4087-b8c2-3652ecda4c4f
 
 base=$(pwd)
 
