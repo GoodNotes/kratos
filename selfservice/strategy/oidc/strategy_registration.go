@@ -184,7 +184,7 @@ func (s *Strategy) Register(w http.ResponseWriter, r *http.Request, f *registrat
 		return s.handleError(ctx, w, r, f, pid, nil, err)
 	}
 
-	provider, err := s.provider(ctx, pid)
+	provider, err := s.providerForAuthentication(ctx, pid, p.IDToken != "")
 	if err != nil {
 		return s.handleError(ctx, w, r, f, pid, nil, err)
 	}

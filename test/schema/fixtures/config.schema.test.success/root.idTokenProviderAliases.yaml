@@ -1,0 +1,22 @@
+serve:
+  public:
+    base_url: "#/definitions/baseUrl"
+
+selfservice:
+  methods:
+    oidc:
+      config:
+        id_token_provider_aliases:
+          google: google-goodsystems
+  default_browser_return_url: "#/definitions/defaultReturnTo"
+
+dsn: foo
+
+identity:
+  schemas:
+    - id: default
+      url: https://example.com
+
+session:
+  cookie:
+    domain: foobar

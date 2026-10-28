@@ -544,13 +544,20 @@ func (s *Strategy) Config(ctx context.Context) (*ConfigurationCollection, error)
 }
 
 func (s *Strategy) provider(ctx context.Context, id string) (Provider, error) {
-	if c, err := s.Config(ctx); err != nil {
+	return s.providerForAuthentication(ctx, id, false)
+}
+
+func (s *Strategy) providerForAuthentication(ctx context.Context, id string, hasIDToken bool) (Provider, error) {
+	c, err := s.Config(ctx)
+	if err != nil {
 		return nil, err
-	} else if provider, err := c.Provider(id, s.d); err != nil {
-		return nil, err
-	} else {
-		return provider, nil
 	}
+	if hasIDToken {
+		if canonicalID, ok := c.IDTokenProviderAliases[id]; ok {
+			id = canonicalID
+		}
+	}
+	return c.Provider(id, s.d)
 }
 
 func (s *Strategy) forwardError(ctx context.Context, w http.ResponseWriter, r *http.Request, f flow.Flow, err error) {

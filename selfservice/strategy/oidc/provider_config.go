@@ -17,11 +17,8 @@ import (
 )
 
 type Configuration struct {
-	// ID is the canonical provider ID stored in identity credentials and sessions.
+	// ID is the provider's ID
 	ID string `json:"id"`
-
-	// PublicID preserves an existing request/form/callback identifier when ID changes.
-	PublicID string `json:"public_id,omitempty"`
 
 	// Provider is either "generic" for a generic OAuth 2.0 / OpenID Connect Provider or one of:
 	// - generic
@@ -141,13 +138,6 @@ type Configuration struct {
 	IDTokenVerificationEnabled bool `json:"id_token_verification_enabled"`
 }
 
-func (p Configuration) RequestID() string {
-	if p.PublicID != "" {
-		return p.PublicID
-	}
-	return p.ID
-}
-
 func (p Configuration) Redir(public *url.URL) string {
 	if p.PKCE == "force" {
 		return urlx.AppendPaths(public, RouteCallbackGeneric).String()
@@ -155,17 +145,19 @@ func (p Configuration) Redir(public *url.URL) string {
 
 	if p.OrganizationID != "" {
 		route := RouteOrganizationCallback
-		route = strings.Replace(route, ":provider", p.RequestID(), 1)
+		route = strings.Replace(route, ":provider", p.ID, 1)
 		route = strings.Replace(route, ":organization", p.OrganizationID, 1)
 		return urlx.AppendPaths(public, route).String()
 	}
 
-	return urlx.AppendPaths(public, strings.Replace(RouteCallback, ":provider", p.RequestID(), 1)).String()
+	return urlx.AppendPaths(public, strings.Replace(RouteCallback, ":provider", p.ID, 1)).String()
 }
 
 type ConfigurationCollection struct {
-	BaseRedirectURI string          `json:"base_redirect_uri"`
-	Providers       []Configuration `json:"providers"`
+	// IDTokenProviderAliases maps legacy request IDs only for ID-token authentication.
+	IDTokenProviderAliases map[string]string `json:"id_token_provider_aliases,omitempty"`
+	BaseRedirectURI        string            `json:"base_redirect_uri"`
+	Providers              []Configuration   `json:"providers"`
 }
 
 // !!! WARNING !!!
@@ -198,22 +190,15 @@ var supportedProviders = map[string]func(config *Configuration, reg Dependencies
 }
 
 func (c ConfigurationCollection) Provider(id string, reg Dependencies) (Provider, error) {
-	var matched *Configuration
 	for k := range c.Providers {
 		p := c.Providers[k]
-		if p.ID != id && (p.PublicID == "" || p.PublicID != id) {
-			continue
+		if p.ID == id {
+			if f, ok := supportedProviders[p.Provider]; ok {
+				return f(&p, reg), nil
+			}
+
+			return nil, errors.Errorf("provider type %s is not supported, supported are: %v", p.Provider, maps.Keys(supportedProviders))
 		}
-		if matched != nil {
-			return nil, errors.Errorf("OpenID Connect Provider %q matches multiple configured providers", id)
-		}
-		matched = &p
 	}
-	if matched == nil {
-		return nil, errors.WithStack(herodot.ErrNotFound.WithReasonf(`OpenID Connect Provider "%s" is unknown or has not been configured`, id))
-	}
-	if f, ok := supportedProviders[matched.Provider]; ok {
-		return f(matched, reg), nil
-	}
-	return nil, errors.Errorf("provider type %s is not supported, supported are: %v", matched.Provider, maps.Keys(supportedProviders))
+	return nil, errors.WithStack(herodot.ErrNotFound.WithReasonf(`OpenID Connect Provider "%s" is unknown or has not been configured`, id))
 }

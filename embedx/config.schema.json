@@ -426,12 +426,6 @@
     "selfServiceOIDCProvider": {
       "type": "object",
       "properties": {
-        "public_id": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Optional public provider identifier accepted in requests and emitted in browser forms, OAuth state and callback URLs. Credentials and sessions retain id. It must not collide with another configured provider identifier.",
-          "examples": ["google"]
-        },
         "id": {
           "type": "string",
           "examples": ["google"]
@@ -1952,6 +1946,15 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
+                    "id_token_provider_aliases": {
+                      "type": "object",
+                      "description": "Maps incoming provider IDs to configured provider IDs only for login or registration submissions with an id_token. Browser authorization, callbacks and settings keep exact provider-ID lookup.",
+                      "additionalProperties": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "examples": [{"google": "google-goodsystems"}]
+                    },
                     "base_redirect_uri": {
                       "type": "string",
                       "title": "Base URL for OAuth2 Redirect URIs",

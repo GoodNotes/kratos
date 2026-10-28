@@ -232,7 +232,7 @@ func (s *Strategy) Login(w http.ResponseWriter, r *http.Request, f *login.Flow, 
 		return nil, s.handleError(ctx, w, r, f, pid, nil, err)
 	}
 
-	provider, err := s.provider(ctx, pid)
+	provider, err := s.providerForAuthentication(ctx, pid, p.IDToken != "")
 	if err != nil {
 		return nil, s.handleError(ctx, w, r, f, pid, nil, err)
 	}
@@ -388,7 +388,7 @@ func (s *Strategy) PopulateLoginMethodIdentifierFirstCredentials(r *http.Request
 
 		for _, l := range linked {
 			lc := l.Config()
-			AddProvider(f.UI, lc.RequestID(), text.NewInfoLoginWith(stringsx.Coalesce(lc.Label, lc.RequestID()), lc.RequestID()))
+			AddProvider(f.UI, lc.ID, text.NewInfoLoginWith(stringsx.Coalesce(lc.Label, lc.ID), lc.ID))
 		}
 	}
 

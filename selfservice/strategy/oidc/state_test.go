@@ -44,17 +44,3 @@ type testProvider struct{}
 func (t *testProvider) Config() *oidc.Configuration {
 	return &oidc.Configuration{ID: "test-provider", PKCE: "never"}
 }
-
-func TestGenerateStateWithPublicProviderID(t *testing.T) {
-	_, reg := internal.NewFastRegistryWithMocks(t)
-	strat := oidc.NewStrategy(reg)
-	ctx := context.Background()
-	provider := oidc.NewProviderGoogle(&oidc.Configuration{ID: "google-goodsystems", PublicID: "google", PKCE: "never"}, reg)
-
-	encrypted, _, err := strat.GenerateState(ctx, provider, x.NewUUID())
-	require.NoError(t, err)
-	state, err := oidc.DecryptState(ctx, reg.Cipher(ctx), encrypted)
-	require.NoError(t, err)
-	assert.Equal(t, "google", state.ProviderId)
-	assert.Equal(t, "google-goodsystems", provider.Config().ID)
-}
