@@ -150,6 +150,7 @@ func testDatabase(t *testing.T, db string, c *pop.Connection) {
 			[]configx.OptionModifier{
 				configx.WithValues(map[string]interface{}{
 					config.ViperKeyDSN:             url,
+					config.ViperKeyNetworkID:       "884f556e-eb3a-4b9f-bee3-11345642c6c0",
 					config.ViperKeyPublicBaseURL:   "https://www.ory.sh/",
 					config.ViperKeyIdentitySchemas: config.Schemas{{ID: "default", URL: "file://stub/default.schema.json"}},
 					config.ViperKeySecretsDefault:  []string{"secret"},

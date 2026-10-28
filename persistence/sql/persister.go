@@ -27,6 +27,7 @@ import (
 	"github.com/ory/x/networkx"
 	"github.com/ory/x/otelx"
 	"github.com/ory/x/popx"
+	"github.com/ory/x/sqlcon"
 )
 
 var _ persistence.Persister = new(Persister)
@@ -131,6 +132,14 @@ func (p Persister) WithNetworkID(nid uuid.UUID) persistence.Persister {
 
 func (p *Persister) DetermineNetwork(ctx context.Context) (*networkx.Network, error) {
 	return p.p.Determine(ctx)
+}
+
+func (p *Persister) NetworkByID(ctx context.Context, id uuid.UUID) (*networkx.Network, error) {
+	var n networkx.Network
+	if err := sqlcon.HandleError(p.Connection(ctx).Find(&n, id)); err != nil {
+		return nil, err
+	}
+	return &n, nil
 }
 
 func (p *Persister) Connection(ctx context.Context) *pop.Connection {

@@ -13,6 +13,8 @@ import (
 	"github.com/gofrs/uuid"
 
 	"github.com/ory/x/configx"
+	"github.com/ory/x/dbal"
+	"github.com/ory/x/networkx"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,21 +25,31 @@ import (
 
 func TestDriverNew(t *testing.T) {
 	ctx := context.Background()
+	dsn := dbal.NewSQLiteTestDatabase(t)
+	nid := uuid.Must(uuid.NewV4())
+
+	migrator, err := driver.New(ctx, os.Stderr, servicelocatorx.NewOptions(), []driver.RegistryOption{driver.SkipNetworkInit},
+		[]configx.OptionModifier{configx.WithValue(config.ViperKeyDSN, dsn), configx.SkipValidation()})
+	require.NoError(t, err)
+	require.NoError(t, migrator.Persister().MigrateUp(ctx))
+	require.NoError(t, migrator.Persister().GetConnection(ctx).Create(&networkx.Network{ID: nid}))
+
 	r, err := driver.New(
 		context.Background(),
 		os.Stderr,
 		servicelocatorx.NewOptions(),
 		nil,
 		[]configx.OptionModifier{
-			configx.WithValue(config.ViperKeyDSN, config.DefaultSQLiteMemoryDSN),
+			configx.WithValue(config.ViperKeyDSN, dsn),
+			configx.WithValue(config.ViperKeyNetworkID, nid.String()),
 			configx.SkipValidation(),
 		})
 	require.NoError(t, err)
 
-	assert.EqualValues(t, config.DefaultSQLiteMemoryDSN, r.Config().DSN(ctx))
+	assert.EqualValues(t, dsn, r.Config().DSN(ctx))
 	require.NoError(t, r.Persister().Ping())
 
-	assert.NotEqual(t, uuid.Nil.String(), r.Persister().NetworkID(context.Background()).String())
+	assert.Equal(t, nid, r.Persister().NetworkID(context.Background()))
 
 	n, err := r.Persister().DetermineNetwork(context.Background())
 	require.NoError(t, err)
