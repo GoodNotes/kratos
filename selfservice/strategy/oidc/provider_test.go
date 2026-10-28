@@ -135,3 +135,12 @@ func TestLocale(t *testing.T) {
 		})
 	}
 }
+
+func RegisterTestGoogleProvider(t *testing.T, id, jwksURL string) {
+	supportedProviders[id] = func(c *Configuration, reg Dependencies) Provider {
+		provider := NewProviderGoogle(c, reg).(*ProviderGoogle)
+		provider.JWKSUrl = jwksURL
+		return provider
+	}
+	t.Cleanup(func() { delete(supportedProviders, id) })
+}

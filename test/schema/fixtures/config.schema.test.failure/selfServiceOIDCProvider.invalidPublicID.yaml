@@ -1,0 +1,6 @@
+id: google-goodsystems
+public_id: 42
+provider: google
+client_id: goodmeet-client
+client_secret: synthetic-test-secret
+mapper_url: file:///etc/config/google.jsonnet

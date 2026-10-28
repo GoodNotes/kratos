@@ -426,6 +426,12 @@
     "selfServiceOIDCProvider": {
       "type": "object",
       "properties": {
+        "public_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional public provider identifier accepted in requests and emitted in browser forms, OAuth state and callback URLs. Credentials and sessions retain id. It must not collide with another configured provider identifier.",
+          "examples": ["google"]
+        },
         "id": {
           "type": "string",
           "examples": ["google"]

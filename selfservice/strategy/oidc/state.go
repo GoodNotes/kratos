@@ -42,7 +42,7 @@ func (s *Strategy) GenerateState(ctx context.Context, p Provider, flowID uuid.UU
 	state := oidcv1.State{
 		FlowId:                         flowID.Bytes(),
 		SessionTokenExchangeCodeSha512: x.NewUUID().Bytes(),
-		ProviderId:                     p.Config().ID,
+		ProviderId:                     p.Config().RequestID(),
 		PkceVerifier:                   maybePKCE(ctx, s.d, p),
 	}
 	if code, hasCode, _ := s.d.SessionTokenExchangePersister().CodeForFlow(ctx, flowID); hasCode {

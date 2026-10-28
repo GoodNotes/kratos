@@ -388,7 +388,7 @@ func (s *Strategy) PopulateLoginMethodIdentifierFirstCredentials(r *http.Request
 
 		for _, l := range linked {
 			lc := l.Config()
-			AddProvider(f.UI, lc.ID, text.NewInfoLoginWith(stringsx.Coalesce(lc.Label, lc.ID), lc.ID))
+			AddProvider(f.UI, lc.RequestID(), text.NewInfoLoginWith(stringsx.Coalesce(lc.Label, lc.RequestID()), lc.RequestID()))
 		}
 	}
 
